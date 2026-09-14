@@ -272,6 +272,12 @@ def compute_at(
     t = moment.t
 
     selected = bodies_mod.resolve(body_keys)
+    if body_keys is None:
+        # Необязательные тела входят в карту, только если для них есть файл
+        # эфемериды: отсутствие Хирона не должно ронять расчёт.
+        selected = selected + tuple(
+            body for body in bodies_mod.OPTIONAL_BODIES if eph.has(body)
+        )
     raw: Dict[str, RawPosition] = {}
     for body in selected:
         if body.kind == "lot":

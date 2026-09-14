@@ -109,6 +109,7 @@ class Ephemeris:
         self.ts = timescale if timescale is not None else _timescale()
         self._earth = self.kernel[399]
         self._cache: dict[str, object] = {}
+        self._small_bodies = _find_small_bodies()
 
     @property
     def name(self) -> str:
@@ -117,11 +118,42 @@ class Ephemeris:
     def close(self) -> None:
         self.kernel.close()
 
+    def has(self, body: Body) -> bool:
+        """Есть ли данные для тела — в ядре DE или в файле малого тела.
+
+        ValueError ловится ради SmallBodyError: испорченный или неподходящий
+        файл малого тела должен означать «тела нет», а не падение карты.
+        """
+        try:
+            self.target(body)
+        except (KeyError, OSError, ValueError):
+            return False
+        return True
+
     def target(self, body: Body):
-        """Возвращает объект Skyfield для тела, выбирая доступный код NAIF."""
+        """Возвращает объект Skyfield для тела, выбирая доступный код NAIF.
+
+        Малые тела в ядрах DE отсутствуют и читаются из отдельных файлов
+        таблиц состояний, лежащих рядом с ядром.
+        """
         cached = self._cache.get(body.key)
         if cached is not None:
             return cached
+
+        if body.kind == "asteroid":
+            path = self._small_bodies.get(body.key)
+            if path is None:
+                raise KeyError(
+                    f"нет файла эфемериды для тела {body.name}: положите "
+                    f"{body.key}.npz в каталог ephemeris/ "
+                    f"(см. scripts/fetch_chiron.py)"
+                )
+            from .smallbody import load as load_small_body
+
+            target = load_small_body(path)
+            self._cache[body.key] = target
+            return target
+
         for code in body.targets:
             if code in self.kernel.codes:
                 target = self.kernel[code]
@@ -187,6 +219,18 @@ class Ephemeris:
     def positions(self, bodies: Sequence[Body], t) -> dict:
         """Положения нескольких тел одним вызовом."""
         return {b.key: self.position(b, t) for b in bodies}
+
+
+def _find_small_bodies() -> dict:
+    """Ищет файлы малых тел рядом с ядром: ephemeris/<ключ>.npz."""
+    found = {}
+    for directory in _candidate_dirs():
+        if not os.path.isdir(directory):
+            continue
+        for name in os.listdir(directory):
+            if name.endswith(".npz"):
+                found.setdefault(name[:-4], os.path.join(directory, name))
+    return found
 
 
 @lru_cache(maxsize=1)

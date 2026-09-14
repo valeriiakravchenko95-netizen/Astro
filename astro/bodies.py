@@ -36,6 +36,11 @@ URANUS = Body("uranus", "Уран", "♅", (7,))
 NEPTUNE = Body("neptune", "Нептун", "♆", (8,))
 PLUTO = Body("pluto", "Плутон", "♇", (9,))
 
+# Малые тела в ядрах DE отсутствуют и читаются из отдельных файлов,
+# которые готовит scripts/fetch_chiron.py. Код NAIF нумерованного
+# астероида — это 2000000 плюс его номер.
+CHIRON = Body("chiron", "Хирон", "\u26b7", (2002060,), kind="asteroid")
+
 # Расчётные точки — считаются не из ядра, а из орбиты Луны.
 MEAN_NODE = Body("mean_node", "Средний Узел", "☊", kind="point")
 TRUE_NODE = Body("true_node", "Истинный Узел", "☊", kind="point")
@@ -58,12 +63,15 @@ LUNAR_POINTS = (MEAN_NODE, TRUE_NODE, SOUTH_NODE, MEAN_LILITH)
 #: Жребии — считаются от углов карты.
 LOTS = (PART_OF_FORTUNE,)
 
+#: Тела, которые попадают в карту только если для них есть файл эфемериды.
+OPTIONAL_BODIES = (CHIRON,)
+
 #: Состав карты по умолчанию: истинный Узел, без среднего.
 DEFAULT_BODIES = EPHEMERIS_BODIES + (
     TRUE_NODE, SOUTH_NODE, MEAN_LILITH, PART_OF_FORTUNE,
 )
 
-ALL_BODIES = EPHEMERIS_BODIES + LUNAR_POINTS + LOTS
+ALL_BODIES = EPHEMERIS_BODIES + LUNAR_POINTS + LOTS + OPTIONAL_BODIES
 
 BY_KEY = {b.key: b for b in ALL_BODIES}
 
