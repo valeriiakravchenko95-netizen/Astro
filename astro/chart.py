@@ -93,6 +93,7 @@ class Chart:
     ruler_scheme: str
     ephemeris: str
     diurnal: Optional[bool] = None
+    lilith_model: str = nodes_mod.LILITH_SWISS
 
     @property
     def primary_houses(self) -> houses_mod.Houses:
@@ -198,6 +199,7 @@ class Chart:
             },
             "chart_ruler": self.chart_ruler,
             "diurnal": self.diurnal,
+            "lilith_model": self.lilith_model,
         }
         if include_birth_data:
             data["birth"] = {
@@ -225,6 +227,7 @@ def compute(
     aspect_set: Optional[Sequence[aspects_mod.Aspect]] = None,
     orb_policy: aspects_mod.OrbPolicy = aspects_mod.DEFAULT_ORBS,
     ruler_scheme: str = rulers_mod.TRADITIONAL,
+    lilith_model: str = nodes_mod.LILITH_SWISS,
     ephemeris: Optional[Ephemeris] = None,
 ) -> Chart:
     """Считает натальную карту на местное гражданское время."""
@@ -246,6 +249,7 @@ def compute(
         aspect_set=aspect_set,
         orb_policy=orb_policy,
         ruler_scheme=ruler_scheme,
+        lilith_model=lilith_model,
         ephemeris=ephemeris,
     )
 
@@ -260,6 +264,7 @@ def compute_at(
     aspect_set: Optional[Sequence[aspects_mod.Aspect]] = None,
     orb_policy: aspects_mod.OrbPolicy = aspects_mod.DEFAULT_ORBS,
     ruler_scheme: str = rulers_mod.TRADITIONAL,
+    lilith_model: str = nodes_mod.LILITH_SWISS,
     ephemeris: Optional[Ephemeris] = None,
 ) -> Chart:
     """Считает карту на уже разрешённый момент времени."""
@@ -272,7 +277,7 @@ def compute_at(
         if body.kind == "lot":
             continue  # считается ниже, после углов
         if nodes_mod.is_lunar_point(body):
-            raw[body.key] = nodes_mod.position(body, eph, t)
+            raw[body.key] = nodes_mod.position(body, eph, t, lilith_model)
         else:
             raw[body.key] = eph.position(body, t)
 
@@ -363,4 +368,5 @@ def compute_at(
         ruler_scheme=ruler_scheme,
         ephemeris=eph.name,
         diurnal=diurnal,
+        lilith_model=lilith_model,
     )

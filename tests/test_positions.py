@@ -124,9 +124,63 @@ def test_true_node_stays_near_mean_node(eph):
     assert 0.5 < worst < 1.8
 
 
-def test_mean_lilith_matches_known_apogee_at_j2000(eph):
-    """Долгота среднего апогея Луны на эпоху J2000 — 263.353°."""
-    assert nodes.mean_lilith_longitude(2451545.0) == pytest.approx(263.3532, abs=0.001)
+def test_mean_lilith_polynomial_matches_known_apogee_at_j2000(eph):
+    """Простой полином даёт известную долготу апогея на J2000 — 263.353°."""
+    value = nodes.mean_lilith_longitude(2451545.0, nodes.LILITH_MEEUS)
+    assert value == pytest.approx(263.3532, abs=0.001)
+
+
+#: Средний апогей по Swiss Ephemeris на нейтральных датах, JD TT → градусы.
+#: Числовые эталоны для модели ``swiss``; сама библиотека в зависимости не
+#: входит, эти значения сняты один раз при выводе ряда поправок.
+SWISS_APOGEE = {
+    2415020.5: 154.332770,   # 1900-01-01
+    2433282.5: 28.779286,    # 1950-01-01
+    2451545.0: 263.464250,   # 2000-01-01
+    2469807.5: 137.821575,   # 2050-01-01
+    2488069.5: 12.223337,    # 2100-01-01
+}
+
+
+@pytest.mark.parametrize("jd_tt,expected", sorted(SWISS_APOGEE.items()))
+def test_swiss_lilith_model_matches_reference(eph, jd_tt, expected):
+    """Модель swiss воспроизводит средний апогей Swiss Ephemeris."""
+    value = nodes.mean_lilith_longitude(jd_tt, nodes.LILITH_SWISS)
+    assert abs(norm180(value - expected)) * 3600 < 1.5
+
+
+def test_lilith_models_differ_by_minutes_of_arc(eph):
+    """Расхождение между моделями доходит до семи угловых минут."""
+    worst = 0.0
+    for day in range(0, 3650, 7):
+        jd = 2451545.0 + day
+        difference = abs(norm180(
+            nodes.mean_lilith_longitude(jd, nodes.LILITH_SWISS)
+            - nodes.mean_lilith_longitude(jd, nodes.LILITH_MEEUS)
+        ))
+        worst = max(worst, difference)
+    assert 6.0 / 60.0 < worst < 8.0 / 60.0
+
+
+def test_unknown_lilith_model_rejected(eph):
+    with pytest.raises(ValueError):
+        nodes.mean_lilith_longitude(2451545.0, "выдуманная")
+
+
+def test_lilith_model_reaches_the_chart(eph):
+    from datetime import datetime as _datetime
+
+    from astro.chart import Place, compute
+
+    moment, place = _datetime(1987, 7, 14, 11, 25), Place(50.4501, 30.5234)
+    swiss = compute(moment, place, ephemeris=eph, lilith_model=nodes.LILITH_SWISS)
+    meeus = compute(moment, place, ephemeris=eph, lilith_model=nodes.LILITH_MEEUS)
+    assert swiss.lilith_model == nodes.LILITH_SWISS
+    difference = abs(norm180(
+        swiss.positions["mean_lilith"].longitude
+        - meeus.positions["mean_lilith"].longitude
+    ))
+    assert difference > 1.0 / 60.0
 
 
 def test_mean_node_matches_known_value_at_j2000(eph):

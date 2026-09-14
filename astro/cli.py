@@ -49,6 +49,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rulers", default=rulers_mod.TRADITIONAL,
                         choices=(rulers_mod.TRADITIONAL, rulers_mod.MODERN),
                         help="схема управителей")
+    parser.add_argument("--lilith", default="swiss", choices=("swiss", "meeus"),
+                        help="модель средней Лилит: swiss совпадает со Swiss Ephemeris, "
+                             "meeus — простой полином (расходятся до 7 угловых минут)")
     parser.add_argument("--minor", action="store_true", help="считать и минорные аспекты")
     parser.add_argument("--orb", action="append", metavar="АСПЕКТ=ГРАДУСЫ", default=[],
                         help="переопределить орбис, например --orb square=6")
@@ -190,6 +193,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             aspect_set=aspect_set,
             orb_policy=_orb_policy(args.orb),
             ruler_scheme=args.rulers,
+            lilith_model=args.lilith,
             ephemeris=ephemeris,
         )
     except houses_mod.HouseError as exc:
