@@ -9,7 +9,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import Callable, Dict, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import (
+    Callable, Dict, FrozenSet, Iterable, Mapping, Optional, Sequence, Tuple,
+)
 
 from .zodiac import norm180, separation
 
@@ -199,22 +201,37 @@ def find_between(
     return best
 
 
+#: Пары, аспект между которыми ничего не значит.
+#:
+#: Узлы стоят в точной оппозиции друг к другу по построению, а не по
+#: расположению карты, и показывать эту оппозицию среди аспектов —
+#: значит выдавать устройство расчёта за свойство карты.
+DEGENERATE_PAIRS = frozenset({
+    frozenset({"true_node", "south_node"}),
+    frozenset({"mean_node", "south_node"}),
+})
+
+
 def find_all(
     positions: Mapping[str, object],
     aspects: Sequence[Aspect] = MAJOR,
     policy: OrbPolicy = DEFAULT_ORBS,
     order: Optional[Sequence[str]] = None,
+    skip_pairs: FrozenSet[FrozenSet[str]] = DEGENERATE_PAIRS,
 ) -> Tuple[AspectHit, ...]:
     """Все аспекты между телами карты.
 
     ``positions`` — отображение ключа тела на объект с полями ``longitude``
     и ``speed``. Каждая пара рассматривается один раз; результат
     отсортирован по возрастанию орбиса, то есть от самых точных.
+    ``skip_pairs`` убирает пары, связанные по построению.
     """
     keys = list(order) if order is not None else list(positions)
     hits = []
     for i, key_a in enumerate(keys):
         for key_b in keys[i + 1:]:
+            if frozenset((key_a, key_b)) in skip_pairs:
+                continue
             pos_a = positions[key_a]
             pos_b = positions[key_b]
             hit = find_between(

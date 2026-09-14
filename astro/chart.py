@@ -67,8 +67,14 @@ class PlanetPosition:
 
     @property
     def stationary(self) -> bool:
-        """Планета близка к стоянию: суточный ход меньше одной минуты дуги."""
-        return abs(self.speed) < 1.0 / 60.0
+        """Тело близко к стоянию.
+
+        Порог у каждого тела свой: общий не годится, потому что минута дуги
+        в сутки для Меркурия — почти остановка, а для Урана обычный ход.
+        У тел, которые не бывают попятными, порог нулевой.
+        """
+        limit = self.body.stationary_limit
+        return limit > 0.0 and abs(self.speed) < limit
 
     def describe(self) -> str:
         mark = " R" if self.retrograde else ""

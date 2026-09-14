@@ -83,10 +83,30 @@ def test_orbs_are_reported_per_edge():
 
 
 def test_node_pair_does_not_manufacture_a_t_square():
-    """Узлы всегда в оппозиции, и это не повод считать фигуру."""
-    longitudes = {"true_node": 0.0, "south_node": 180.0, "venus": 90.0}
-    assert keys_of(figures(longitudes)) == set()
-    assert keys_of(figures(longitudes, excluded=frozenset())) == {"t_square"}
+    """Узлы всегда в оппозиции, и это не повод считать фигуру.
+
+    Защит две, и проверяются обе: аспект между узлами не считается вовсе,
+    а поиск фигур вдобавок не берёт южный узел в вершины.
+    """
+    positions = {
+        "true_node": Point(0.0), "south_node": Point(180.0), "venus": Point(90.0),
+    }
+
+    hits = aspects.find_all(positions)
+    assert not any(
+        {hit.body_a, hit.body_b} == {"true_node", "south_node"} for hit in hits
+    )
+    assert keys_of(patterns.find_patterns(hits)) == set()
+
+    unguarded = aspects.find_all(positions, skip_pairs=frozenset())
+    assert keys_of(patterns.find_patterns(unguarded)) == set()
+    assert keys_of(patterns.find_patterns(unguarded, excluded=frozenset())) == {"t_square"}
+
+
+def test_degenerate_pair_is_skipped_in_aspects():
+    positions = {"mean_node": Point(10.0), "south_node": Point(190.0)}
+    assert aspects.find_all(positions) == ()
+    assert aspects.find_all(positions, skip_pairs=frozenset()) != ()
 
 
 def test_stellium_by_conjunction_and_by_sign():
