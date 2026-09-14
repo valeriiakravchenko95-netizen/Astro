@@ -14,6 +14,7 @@ from . import bodies as bodies_mod
 from . import houses as houses_mod
 from . import lots as lots_mod
 from . import nodes as nodes_mod
+from . import patterns as patterns_mod
 from . import rulers as rulers_mod
 from . import timeutil
 from .bodies import Body
@@ -90,6 +91,10 @@ class Chart:
     aspects: Tuple[aspects_mod.AspectHit, ...]
     angle_aspects: Tuple[aspects_mod.AspectHit, ...]
     dispositors: rulers_mod.DispositorTree
+    patterns: Tuple[patterns_mod.PatternHit, ...]
+    stelliums: Tuple[patterns_mod.Stellium, ...]
+    antiscia: Tuple[patterns_mod.AntisciaHit, ...]
+    dignities: Mapping[str, rulers_mod.EssentialDignities]
     ruler_scheme: str
     ephemeris: str
     diurnal: Optional[bool] = None
@@ -197,6 +202,39 @@ class Chart:
                 "final": list(self.dispositors.final_dispositors),
                 "mutual_receptions": [list(p) for p in self.dispositors.mutual_receptions],
             },
+            "patterns": [
+                {
+                    "key": hit.key,
+                    "name": hit.name,
+                    "bodies": list(hit.bodies),
+                    "worst_orb": hit.worst_orb,
+                }
+                for hit in self.patterns
+            ],
+            "stelliums": [
+                {
+                    "bodies": list(item.bodies),
+                    "sign_index": item.sign_index,
+                    "by_conjunction": item.by_conjunction,
+                }
+                for item in self.stelliums
+            ],
+            "antiscia": [
+                {"a": hit.body_a, "b": hit.body_b, "kind": hit.kind, "orb": hit.orb}
+                for hit in self.antiscia
+            ],
+            "dignities": {
+                key: {
+                    "state": item.state,
+                    "own": list(item.own),
+                    "ruler": item.ruler,
+                    "triplicity": item.triplicity,
+                    "term": item.term,
+                    "decan": item.decan,
+                    "peregrine": item.peregrine,
+                }
+                for key, item in self.dignities.items()
+            },
             "chart_ruler": self.chart_ruler,
             "diurnal": self.diurnal,
             "lilith_model": self.lilith_model,
@@ -228,6 +266,7 @@ def compute(
     orb_policy: aspects_mod.OrbPolicy = aspects_mod.DEFAULT_ORBS,
     ruler_scheme: str = rulers_mod.TRADITIONAL,
     lilith_model: str = nodes_mod.LILITH_SWISS,
+    antiscia_orb: float = 1.0,
     ephemeris: Optional[Ephemeris] = None,
 ) -> Chart:
     """Считает натальную карту на местное гражданское время."""
@@ -250,6 +289,7 @@ def compute(
         orb_policy=orb_policy,
         ruler_scheme=ruler_scheme,
         lilith_model=lilith_model,
+        antiscia_orb=antiscia_orb,
         ephemeris=ephemeris,
     )
 
@@ -265,6 +305,7 @@ def compute_at(
     orb_policy: aspects_mod.OrbPolicy = aspects_mod.DEFAULT_ORBS,
     ruler_scheme: str = rulers_mod.TRADITIONAL,
     lilith_model: str = nodes_mod.LILITH_SWISS,
+    antiscia_orb: float = 1.0,
     ephemeris: Optional[Ephemeris] = None,
 ) -> Chart:
     """Считает карту на уже разрешённый момент времени."""
@@ -289,15 +330,18 @@ def compute_at(
 
     chart_angles = angles_mod.compute(t, place.latitude, place.longitude)
 
-    # Жребии зависят от Асцендента, поэтому считаются после углов и только
-    # если в составе карты есть и Солнце, и Луна.
+    # Секта нужна и жребиям, и триплицитетам, поэтому считается всегда, как
+    # только в карте есть Солнце.
     diurnal = None
+    if bodies_mod.SUN.key in raw:
+        diurnal = lots_mod.is_diurnal(raw[bodies_mod.SUN.key].longitude, chart_angles.asc)
+
+    # Жребии зависят от Асцендента, поэтому считаются после углов.
     if bodies_mod.PART_OF_FORTUNE in selected:
         if bodies_mod.SUN.key not in raw or bodies_mod.MOON.key not in raw:
             raise ValueError("для Части Фортуны нужны Солнце и Луна в составе карты")
         sun_longitude = raw[bodies_mod.SUN.key].longitude
         moon_longitude = raw[bodies_mod.MOON.key].longitude
-        diurnal = lots_mod.is_diurnal(sun_longitude, chart_angles.asc)
         raw[bodies_mod.PART_OF_FORTUNE.key] = RawPosition(
             longitude=lots_mod.part_of_fortune(
                 chart_angles.asc, sun_longitude, moon_longitude, diurnal
@@ -361,6 +405,24 @@ def compute_at(
         bodies=[b.key for b in selected],
     )
 
+    figures = patterns_mod.find_patterns(hits)
+    stelliums = patterns_mod.find_stelliums(positions, hits)
+    antiscia = patterns_mod.find_antiscia(
+        positions, orb=antiscia_orb, order=[b.key for b in selected]
+    )
+
+    # Достоинства определены для тел, а не для расчётных точек: у узлов,
+    # Лилит и жребиев нет ни обители, ни экзальтации.
+    dignities = {}
+    if diurnal is not None:
+        dignities = {
+            key: rulers_mod.essential_dignities(
+                key, position.longitude, diurnal, ruler_scheme
+            )
+            for key, position in positions.items()
+            if position.body.kind in ("planet", "luminary", "asteroid")
+        }
+
     return Chart(
         moment=moment,
         place=place,
@@ -371,6 +433,10 @@ def compute_at(
         aspects=hits,
         angle_aspects=tuple(angle_hits),
         dispositors=dispositors,
+        patterns=figures,
+        stelliums=stelliums,
+        antiscia=antiscia,
+        dignities=dignities,
         ruler_scheme=ruler_scheme,
         ephemeris=eph.name,
         diurnal=diurnal,

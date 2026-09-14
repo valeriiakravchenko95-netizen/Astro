@@ -44,6 +44,9 @@ DIGNITY_NAMES = {
     "detriment": "изгнание",
     "fall": "падение",
     "peregrine": "перегрин",
+    "triplicity": "триплицитет",
+    "term": "терм",
+    "decan": "декан",
 }
 
 
@@ -217,3 +220,194 @@ def describe_chain(
     if body in cycle:
         return f"{label(body)} в кольце: {ring}"
     return " \u2192 ".join(steps) + f" \u2192 кольцо: {ring}"
+
+
+# --- Триплицитеты, термы, деканаты -----------------------------------------
+
+DOROTHEUS = "dorotheus"
+PTOLEMY = "ptolemy"
+
+#: Управители триплицитетов по схеме Дорофея: стихия → (дневной, ночной,
+#: участвующий). Индекс стихии — это индекс знака по модулю 4.
+TRIPLICITY_DOROTHEUS: Dict[int, Tuple[str, str, str]] = {
+    0: ("sun", "jupiter", "saturn"),      # Огонь
+    1: ("venus", "moon", "mars"),         # Земля
+    2: ("saturn", "mercury", "jupiter"),  # Воздух
+    3: ("venus", "mars", "moon"),         # Вода
+}
+
+#: Схема Птолемея: участвующего управителя нет, у Воды оба — Марс.
+TRIPLICITY_PTOLEMY: Dict[int, Tuple[str, str, Optional[str]]] = {
+    0: ("sun", "jupiter", None),
+    1: ("venus", "moon", None),
+    2: ("saturn", "mercury", None),
+    3: ("mars", "mars", None),
+}
+
+TRIPLICITY_SCHEMES = {
+    DOROTHEUS: TRIPLICITY_DOROTHEUS,
+    PTOLEMY: TRIPLICITY_PTOLEMY,
+}
+
+#: Египетские термы: знак → список (управитель, граница в градусах знака).
+#: Границы задают отрезки от предыдущей до указанной. В сумме на каждый знак
+#: приходится ровно 30°, а по всему кругу: Венера 82°, Юпитер 79°,
+#: Меркурий 76°, Марс 66°, Сатурн 57°.
+EGYPTIAN_TERMS: Dict[int, Tuple[Tuple[str, float], ...]] = {
+    0: (("jupiter", 6), ("venus", 12), ("mercury", 20), ("mars", 25), ("saturn", 30)),
+    1: (("venus", 8), ("mercury", 14), ("jupiter", 22), ("saturn", 27), ("mars", 30)),
+    2: (("mercury", 6), ("jupiter", 12), ("venus", 17), ("mars", 24), ("saturn", 30)),
+    3: (("mars", 7), ("venus", 13), ("mercury", 19), ("jupiter", 26), ("saturn", 30)),
+    4: (("jupiter", 6), ("venus", 11), ("saturn", 18), ("mercury", 24), ("mars", 30)),
+    5: (("mercury", 7), ("venus", 17), ("jupiter", 21), ("mars", 28), ("saturn", 30)),
+    6: (("saturn", 6), ("mercury", 14), ("jupiter", 21), ("venus", 28), ("mars", 30)),
+    7: (("mars", 7), ("venus", 11), ("mercury", 19), ("jupiter", 24), ("saturn", 30)),
+    8: (("jupiter", 12), ("venus", 17), ("mercury", 21), ("saturn", 26), ("mars", 30)),
+    9: (("mercury", 7), ("jupiter", 14), ("venus", 22), ("saturn", 26), ("mars", 30)),
+    10: (("mercury", 7), ("venus", 13), ("jupiter", 20), ("mars", 25), ("saturn", 30)),
+    11: (("venus", 12), ("jupiter", 16), ("mercury", 19), ("mars", 28), ("saturn", 30)),
+}
+
+CHALDEAN = "chaldean"
+TRIPLICITY_DECANS = "triplicity"
+
+#: Халдейский порядок планет по убыванию видимой скорости.
+CHALDEAN_ORDER = ("saturn", "jupiter", "mars", "sun", "venus", "mercury", "moon")
+
+
+def triplicity_rulers(
+    sign_index: int, scheme: str = DOROTHEUS
+) -> Tuple[str, str, Optional[str]]:
+    """Управители триплицитета знака: дневной, ночной и участвующий."""
+    try:
+        table = TRIPLICITY_SCHEMES[scheme]
+    except KeyError:
+        raise ValueError(f"неизвестная схема триплицитетов: {scheme!r}") from None
+    return table[sign_index % 12 % 4]
+
+
+def triplicity_ruler(sign_index: int, diurnal: bool, scheme: str = DOROTHEUS) -> str:
+    """Управитель триплицитета, соответствующий секте карты."""
+    day, night, _ = triplicity_rulers(sign_index, scheme)
+    return day if diurnal else night
+
+
+def term_ruler(longitude: float) -> str:
+    """Управитель терма, в который попадает долгота."""
+    sign_index = int(longitude % 360.0 // 30)
+    degree = longitude % 30.0
+    for ruler, boundary in EGYPTIAN_TERMS[sign_index]:
+        if degree < boundary:
+            return ruler
+    return EGYPTIAN_TERMS[sign_index][-1][0]  # ровно 30° — последний терм
+
+
+def term_bounds(longitude: float) -> Tuple[float, float]:
+    """Границы терма в градусах знака."""
+    sign_index = int(longitude % 360.0 // 30)
+    degree = longitude % 30.0
+    start = 0.0
+    for _, boundary in EGYPTIAN_TERMS[sign_index]:
+        if degree < boundary:
+            return start, float(boundary)
+        start = float(boundary)
+    return start, 30.0
+
+
+def decan_index(longitude: float) -> int:
+    """Номер декана внутри знака: 0, 1 или 2."""
+    return int((longitude % 30.0) // 10)
+
+
+def decan_ruler(longitude: float, scheme: str = CHALDEAN) -> str:
+    """Управитель декана.
+
+    ``chaldean`` раздаёт деканы по халдейскому ряду планет, начиная с Марса
+    в первом декане Овна. ``triplicity`` отдаёт деканы знака управителям
+    знаков той же стихии по порядку.
+    """
+    sign_index = int(longitude % 360.0 // 30)
+    index = decan_index(longitude)
+    if scheme == CHALDEAN:
+        # Первый декан Овна — Марс, то есть третья планета халдейского ряда.
+        position = CHALDEAN_ORDER.index("mars") + sign_index * 3 + index
+        return CHALDEAN_ORDER[position % 7]
+    if scheme == TRIPLICITY_DECANS:
+        element_sign = (sign_index + 4 * index) % 12
+        return ruler_of(element_sign, TRADITIONAL)
+    raise ValueError(f"неизвестная схема деканов: {scheme!r}")
+
+
+@dataclass(frozen=True)
+class EssentialDignities:
+    """Полный разбор эссенциальных достоинств тела в градусе."""
+
+    body: str
+    longitude: float
+    sign_index: int
+    ruler: str
+    exaltation_ruler: Optional[str]
+    triplicity: str
+    term: str
+    decan: str
+    #: Мажорное состояние: обитель, экзальтация, изгнание, падение либо
+    #: peregrine, если нет ни одного из них. Внимание: тело без мажорного
+    #: состояния ещё не перегрин — у него могут быть триплицитет, терм или
+    #: декан. Настоящий перегрин — это свойство ``peregrine`` ниже.
+    state: str
+
+    @property
+    def own(self) -> Tuple[str, ...]:
+        """Какие именно достоинства тело занимает само."""
+        held = []
+        if self.ruler == self.body:
+            held.append("domicile")
+        if self.exaltation_ruler == self.body:
+            held.append("exaltation")
+        if self.triplicity == self.body:
+            held.append("triplicity")
+        if self.term == self.body:
+            held.append("term")
+        if self.decan == self.body:
+            held.append("decan")
+        return tuple(held)
+
+    @property
+    def peregrine(self) -> bool:
+        """Перегрин — тело не занимает ни одного из пяти достоинств.
+
+        Именно пяти: обители, экзальтации, триплицитета, терма и декана.
+        Отсутствие одной лишь обители перегрином не делает.
+        """
+        return not self.own
+
+
+def exaltation_ruler_of(sign_index: int) -> Optional[str]:
+    """Какое тело экзальтирует в знаке, если такое есть."""
+    for body, (index, _) in EXALTATIONS.items():
+        if index == sign_index % 12:
+            return body
+    return None
+
+
+def essential_dignities(
+    body: str,
+    longitude: float,
+    diurnal: bool,
+    scheme: str = TRADITIONAL,
+    triplicity_scheme: str = DOROTHEUS,
+    decan_scheme: str = CHALDEAN,
+) -> EssentialDignities:
+    """Собирает все пять достоинств для тела в его градусе."""
+    sign_index = int(longitude % 360.0 // 30)
+    return EssentialDignities(
+        body=body,
+        longitude=longitude % 360.0,
+        sign_index=sign_index,
+        ruler=ruler_of(sign_index, scheme),
+        exaltation_ruler=exaltation_ruler_of(sign_index),
+        triplicity=triplicity_ruler(sign_index, diurnal, triplicity_scheme),
+        term=term_ruler(longitude),
+        decan=decan_ruler(longitude, decan_scheme),
+        state=dignity(body, sign_index, scheme),
+    )

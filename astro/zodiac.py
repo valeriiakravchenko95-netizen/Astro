@@ -109,3 +109,19 @@ def format_signed_arc(value: float) -> str:
     degree, rem = divmod(total_seconds, 3600)
     minute, second = divmod(rem, 60)
     return f"{sign}{degree}°{minute:02d}'{second:02d}\""
+
+
+def antiscion(longitude: float) -> float:
+    """Антис — отражение точки относительно оси солнцестояний.
+
+    Ось проходит через 0° Рака и 0° Козерога, то есть через точки, где
+    Солнце стоит выше и ниже всего. Отражение переводит градус в тот,
+    где день той же длины: 10° Тельца и 20° Льва равноудалены от
+    солнцестояния и потому считаются связанными.
+    """
+    return norm360(180.0 - longitude)
+
+
+def contra_antiscion(longitude: float) -> float:
+    """Контр-антис — отражение относительно оси равноденствий."""
+    return norm360(360.0 - longitude)

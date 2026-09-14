@@ -52,6 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--lilith", default="swiss", choices=("swiss", "meeus"),
                         help="модель средней Лилит: swiss совпадает со Swiss Ephemeris, "
                              "meeus — простой полином (расходятся до 7 угловых минут)")
+    parser.add_argument("--antiscia-orb", type=float, default=1.0,
+                        help="орбис контактов по антисам, градусы (по умолчанию 1)")
     parser.add_argument("--minor", action="store_true", help="считать и минорные аспекты")
     parser.add_argument("--orb", action="append", metavar="АСПЕКТ=ГРАДУСЫ", default=[],
                         help="переопределить орбис, например --orb square=6")
@@ -151,6 +153,46 @@ def render(chart: Chart) -> str:
             )
         lines.append("")
 
+    if chart.dignities:
+        lines.append("ДОСТОИНСТВА")
+        lines.append(f"  Карта {'дневная' if chart.diurnal else 'ночная'}")
+        header = (f"  {'тело':16s} {'состояние':13s} {'управитель':11s} "
+                  f"{'триплицитет':12s} {'терм':11s} {'декан':11s} своё")
+        lines.append(header)
+        for key, item in chart.dignities.items():
+            own = ", ".join(rulers_mod.dignity_name(code) for code in item.own)
+            if item.peregrine:
+                own = "перегрин"
+            # Прочерк вместо "перегрин": отсутствие обители и экзальтации
+            # ещё не делает тело перегрином, у него бывают терм или декан.
+            state = "" if item.state == "peregrine" else rulers_mod.dignity_name(item.state)
+            lines.append(
+                f"  {label(key):16s} {state:13s} {label(item.ruler):11s} "
+                f"{label(item.triplicity):12s} {label(item.term):11s} "
+                f"{label(item.decan):11s} {own}"
+            )
+        lines.append("")
+
+    if chart.patterns or chart.stelliums:
+        lines.append("ФИГУРЫ")
+        for hit in chart.patterns:
+            members = ", ".join(label(key) for key in hit.bodies)
+            lines.append(f"  {hit.name:28s} {members}   худший орб {hit.worst_orb:.2f}°")
+        for item in chart.stelliums:
+            how = "в соединении" if item.by_conjunction else "в одном знаке"
+            members = ", ".join(label(key) for key in item.bodies)
+            lines.append(f"  {'Стеллиум ' + how:28s} {members}")
+        lines.append("")
+
+    if chart.antiscia:
+        lines.append("АНТИСЫ")
+        for hit in chart.antiscia:
+            lines.append(
+                f"  {hit.name:14s} {label(hit.body_a):16s} {label(hit.body_b):16s}"
+                f"  орб {hit.orb:.2f}°"
+            )
+        lines.append("")
+
     lines.append("ДИСПОЗИТОРЫ")
     for key in chart.positions:
         if chart.dispositors.dispositor.get(key) is None and not chart.dispositors.chain_of(key):
@@ -194,6 +236,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             orb_policy=_orb_policy(args.orb),
             ruler_scheme=args.rulers,
             lilith_model=args.lilith,
+            antiscia_orb=args.antiscia_orb,
             ephemeris=ephemeris,
         )
     except houses_mod.HouseError as exc:
