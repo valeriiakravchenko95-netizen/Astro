@@ -140,6 +140,50 @@ def test_config_requires_a_token(monkeypatch):
         Config.from_env()
 
 
+def test_env_file_is_read(tmp_path, monkeypatch):
+    from bot.config import load_env_file
+
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("ASTRO_RULERS", raising=False)
+    path = tmp_path / ".env"
+    path.write_text(
+        "# комментарий\n"
+        "TELEGRAM_BOT_TOKEN=\"из-файла\"\n"
+        "\n"
+        "ASTRO_RULERS = modern\n"
+        "мусор без равно\n",
+        encoding="utf-8",
+    )
+    load_env_file(str(path))
+    assert os.environ["TELEGRAM_BOT_TOKEN"] == "из-файла"
+    assert os.environ["ASTRO_RULERS"] == "modern"
+
+
+def test_env_file_does_not_override_the_environment(tmp_path, monkeypatch):
+    """На сервере настройки задают окружением, и файл не должен их перебивать."""
+    from bot.config import load_env_file
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "из-окружения")
+    path = tmp_path / ".env"
+    path.write_text("TELEGRAM_BOT_TOKEN=из-файла\n", encoding="utf-8")
+    load_env_file(str(path))
+    assert os.environ["TELEGRAM_BOT_TOKEN"] == "из-окружения"
+
+
+def test_missing_env_file_is_not_an_error(tmp_path):
+    from bot.config import load_env_file
+
+    load_env_file(str(tmp_path / "нет-такого"))
+
+
+def test_config_error_explains_how_to_get_a_token(monkeypatch, tmp_path):
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ConfigError) as error:
+        Config.from_env()
+    assert "@BotFather" in str(error.value)
+
+
 def test_config_reads_the_environment(monkeypatch):
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "secret")
     monkeypatch.setenv("ASTRO_HOUSE_SYSTEM", "whole_sign")
