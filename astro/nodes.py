@@ -18,7 +18,7 @@ from __future__ import annotations
 import math
 from typing import Tuple
 
-from .bodies import Body, MEAN_LILITH, MEAN_NODE, TRUE_NODE
+from .bodies import Body, MEAN_LILITH, MEAN_NODE, SOUTH_NODE, TRUE_NODE
 from .ephemeris import Ephemeris, RawPosition
 from .zodiac import norm360
 
@@ -106,12 +106,16 @@ def _mean_lilith(eph: Ephemeris, t) -> float:
     return mean_lilith_longitude(t.tt)
 
 
+def _south_node(eph: Ephemeris, t) -> float:
+    return norm360(true_node_longitude(eph, t) + 180.0)
+
+
 _POINTS = {
     MEAN_NODE.key: _mean_node,
-    TRUE_NODE.key: _mean_node,  # перекрывается ниже
+    TRUE_NODE.key: true_node_longitude,
+    SOUTH_NODE.key: _south_node,
     MEAN_LILITH.key: _mean_lilith,
 }
-_POINTS[TRUE_NODE.key] = true_node_longitude
 
 
 def is_lunar_point(body: Body) -> bool:

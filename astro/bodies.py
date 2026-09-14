@@ -40,6 +40,11 @@ PLUTO = Body("pluto", "Плутон", "♇", (9,))
 MEAN_NODE = Body("mean_node", "Средний Узел", "☊", kind="point")
 TRUE_NODE = Body("true_node", "Истинный Узел", "☊", kind="point")
 MEAN_LILITH = Body("mean_lilith", "Лилит (средняя)", "⚸", kind="point")
+SOUTH_NODE = Body("south_node", "Нисходящий Узел", "\u260b", kind="point")
+
+# Жребий Фортуны считается из углов карты, а не из положения тел,
+# поэтому стоит особняком: без Асцендента его не существует.
+PART_OF_FORTUNE = Body("part_of_fortune", "Часть Фортуны", "\u2297", kind="lot")
 
 #: Семь видимых планет традиционной астрологии.
 CLASSICAL = (SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN)
@@ -48,12 +53,17 @@ CLASSICAL = (SUN, MOON, MERCURY, VENUS, MARS, JUPITER, SATURN)
 EPHEMERIS_BODIES = CLASSICAL + (URANUS, NEPTUNE, PLUTO)
 
 #: Расчётные точки лунной орбиты.
-LUNAR_POINTS = (MEAN_NODE, TRUE_NODE, MEAN_LILITH)
+LUNAR_POINTS = (MEAN_NODE, TRUE_NODE, SOUTH_NODE, MEAN_LILITH)
+
+#: Жребии — считаются от углов карты.
+LOTS = (PART_OF_FORTUNE,)
 
 #: Состав карты по умолчанию: истинный Узел, без среднего.
-DEFAULT_BODIES = EPHEMERIS_BODIES + (TRUE_NODE, MEAN_LILITH)
+DEFAULT_BODIES = EPHEMERIS_BODIES + (
+    TRUE_NODE, SOUTH_NODE, MEAN_LILITH, PART_OF_FORTUNE,
+)
 
-ALL_BODIES = EPHEMERIS_BODIES + LUNAR_POINTS
+ALL_BODIES = EPHEMERIS_BODIES + LUNAR_POINTS + LOTS
 
 BY_KEY = {b.key: b for b in ALL_BODIES}
 

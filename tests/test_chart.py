@@ -20,7 +20,8 @@ def chart(eph):
 def test_chart_has_all_default_bodies(chart):
     expected = {
         "sun", "moon", "mercury", "venus", "mars", "jupiter",
-        "saturn", "uranus", "neptune", "pluto", "true_node", "mean_lilith",
+        "saturn", "uranus", "neptune", "pluto",
+        "true_node", "south_node", "mean_lilith", "part_of_fortune",
     }
     assert set(chart.positions) == expected
 

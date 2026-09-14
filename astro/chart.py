@@ -12,6 +12,7 @@ from . import angles as angles_mod
 from . import aspects as aspects_mod
 from . import bodies as bodies_mod
 from . import houses as houses_mod
+from . import lots as lots_mod
 from . import nodes as nodes_mod
 from . import rulers as rulers_mod
 from . import timeutil
@@ -91,6 +92,7 @@ class Chart:
     dispositors: rulers_mod.DispositorTree
     ruler_scheme: str
     ephemeris: str
+    diurnal: Optional[bool] = None
 
     @property
     def primary_houses(self) -> houses_mod.Houses:
@@ -195,6 +197,7 @@ class Chart:
                 "mutual_receptions": [list(p) for p in self.dispositors.mutual_receptions],
             },
             "chart_ruler": self.chart_ruler,
+            "diurnal": self.diurnal,
         }
         if include_birth_data:
             data["birth"] = {
@@ -266,12 +269,36 @@ def compute_at(
     selected = bodies_mod.resolve(body_keys)
     raw: Dict[str, RawPosition] = {}
     for body in selected:
+        if body.kind == "lot":
+            continue  # считается ниже, после углов
         if nodes_mod.is_lunar_point(body):
             raw[body.key] = nodes_mod.position(body, eph, t)
         else:
             raw[body.key] = eph.position(body, t)
 
     chart_angles = angles_mod.compute(t, place.latitude, place.longitude)
+
+    # Жребии зависят от Асцендента, поэтому считаются после углов и только
+    # если в составе карты есть и Солнце, и Луна.
+    diurnal = None
+    if bodies_mod.PART_OF_FORTUNE in selected:
+        if bodies_mod.SUN.key not in raw or bodies_mod.MOON.key not in raw:
+            raise ValueError("для Части Фортуны нужны Солнце и Луна в составе карты")
+        sun_longitude = raw[bodies_mod.SUN.key].longitude
+        moon_longitude = raw[bodies_mod.MOON.key].longitude
+        diurnal = lots_mod.is_diurnal(sun_longitude, chart_angles.asc)
+        raw[bodies_mod.PART_OF_FORTUNE.key] = RawPosition(
+            longitude=lots_mod.part_of_fortune(
+                chart_angles.asc, sun_longitude, moon_longitude, diurnal
+            ),
+            latitude=0.0,
+            distance=float("nan"),
+            # Жребий движется вместе с Асцендентом, то есть примерно градус
+            # в четыре минуты. Такая скорость не описывает движение среди
+            # знаков, и схождение аспектов по ней считать бессмысленно,
+            # поэтому здесь она нулевая.
+            speed=0.0,
+        )
 
     if not house_systems:
         raise ValueError("нужна хотя бы одна система домов")
@@ -335,4 +362,5 @@ def compute_at(
         dispositors=dispositors,
         ruler_scheme=ruler_scheme,
         ephemeris=eph.name,
+        diurnal=diurnal,
     )
