@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Натальная карта — расчёт</title>
+<meta name="description" content="Расчёт натальной карты: положения планет, дома, аспекты. Считается прямо в браузере, данные никуда не отправляются.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Натальная карта</h1>
+    <p>Положения планет, дома и аспекты. Расчёт идёт прямо в вашем браузере — дата и место рождения никуда не отправляются.</p>
+  </header>
+
+  <form class="card" id="form">
+    <div class="field">
+      <label for="date">Дата рождения</label>
+      <input type="date" id="date" required>
+    </div>
+
+    <div class="field">
+      <label for="time">Время рождения</label>
+      <input type="time" id="time">
+      <label class="check">
+        <input type="checkbox" id="unknown-time">
+        Времени не знаю
+      </label>
+    </div>
+
+    <div class="field">
+      <label for="place">Место рождения</label>
+      <input type="text" id="place" autocomplete="off" placeholder="Город — можно по-русски">
+      <div class="suggest" id="suggest" hidden></div>
+    </div>
+
+    <button type="submit" id="submit" disabled>Загружаю данные…</button>
+    <p class="status" id="status"></p>
+  </form>
+
+  <div id="result" hidden></div>
+
+  <footer>
+    <p>Расчёт по эфемеридам JPL. Ничего не сохраняется и никуда не передаётся.</p>
+  </footer>
+
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

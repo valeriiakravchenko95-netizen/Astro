@@ -1,0 +1,44 @@
+{
+  "_прочтите": "Тексты трактовок правятся прямо здесь, код трогать не нужно. Ключи описаны в content/README.md. Пустой или отсутствующий текст просто не показывается — карта от этого не ломается.",
+  "topics": [
+    {
+      "key": "character",
+      "name": "Характер"
+    },
+    {
+      "key": "money",
+      "name": "Деньги и работа"
+    },
+    {
+      "key": "relations",
+      "name": "Отношения"
+    },
+    {
+      "key": "purpose",
+      "name": "Предназначение"
+    }
+  ],
+  "texts": {
+    "planet_in_sign": {
+      "sun.0": "",
+      "moon.3": "",
+      "venus.1": ""
+    },
+    "planet_in_house": {
+      "sun.10": "",
+      "moon.4": ""
+    },
+    "ascendant": {
+      "asc.6": ""
+    },
+    "aspect": {
+      "moon.sun.square": "",
+      "mars.venus.conjunction": ""
+    },
+    "dignity": {
+      "sun.domicile": "",
+      "venus.exaltation": ""
+    },
+    "house_ruler": {}
+  }
+}

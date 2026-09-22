@@ -1,0 +1,45 @@
+# Публикация страницы расчёта на GitHub Pages.
+#
+# Включается один раз: в настройках репозитория, раздел Pages, источником
+# нужно выбрать GitHub Actions. После этого каждая правка в ветке main
+# сама попадает на страницу за пару минут.
+
+name: Публикация страницы
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Одновременно идёт только одна публикация; начатую не обрываем.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Проверить, что данные на месте
+        run: |
+          test -s web/data/ephemeris.bin || { echo "нет таблиц эфемерид"; exit 1; }
+          test -s web/data/cities.json || { echo "нет списка городов"; exit 1; }
+          python3 -c "import json; json.load(open('web/content/interpretations.json'))"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4
