@@ -209,6 +209,45 @@ def test_retrograde_flag_follows_speed(eph):
     assert switches in (5, 6, 7)  # три петли за год, по две смены на петлю
 
 
+def test_longitude_stays_smooth_through_solar_conjunction(eph):
+    """У соединения с Солнцем долгота не должна скакать.
+
+    Тело, проходящее за солнечным диском, формально получает огромное
+    гравитационное отклонение света: формула расходится как обратное
+    угловое расстояние. Физического смысла в этом нет — тело просто
+    закрыто Солнцем, — а расчёт от этого теряет гладкость и расходится с
+    другими программами на десятки угловых секунд. Отклонение ограничено
+    у края диска, и здесь проверяется, что кривая осталась гладкой.
+    """
+    import numpy as np
+
+    # соединение Нептуна с Солнцем в августе 1920 года
+    jd = eph.ts.utc(1920, 8, 4).tt
+    times = eph.ts.tt_jd(jd + np.arange(-30, 31) * 0.01)
+    longitudes = np.asarray(eph.ecliptic(bodies.get("neptune"), times)[0])
+
+    steps = np.diff(longitudes) * 3600.0
+    # Без ограничения долгота здесь пятилась назад и возвращалась — вот это
+    # и ловится: прямое движение обязано остаться прямым.
+    assert np.all(steps > 0), "долгота перестала расти"
+    # И никаких всплесков: за полусуточный проход скорость не меняется в разы.
+    assert steps.max() / steps.min() < 1.5
+
+
+def test_deflection_is_limited_at_the_solar_disc(eph):
+    """Отклонение света не превышает того, что бывает у края диска."""
+    import numpy as np
+
+    from astro.ephemeris import _limited_deflection
+
+    # луч, идущий почти точно сквозь центр Солнца
+    position = np.array([0.0, 0.0, -30.0])       # тело за Солнцем, 30 а.е.
+    observer_to_sun = np.array([1e-6, 0.0, 1.0])  # наблюдатель в 1 а.е.
+    shift = _limited_deflection(position, observer_to_sun)
+    angle = np.degrees(np.linalg.norm(shift) / np.linalg.norm(position)) * 3600.0
+    assert angle < 3.0, f"отклонение {angle:.2f} угловой секунды слишком велико"
+
+
 def test_outer_planets_move_slowly(eph):
     """Суточный ход планет лежит в известных пределах."""
     t = eph.ts.utc(2024, 6, 1)

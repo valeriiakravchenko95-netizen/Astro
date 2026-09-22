@@ -11,8 +11,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional, Sequence
 
+import numpy as np
 from skyfield.api import load_file
+from skyfield.constants import AU_M, C, GS
 from skyfield.framelib import ecliptic_frame
+from skyfield.functions import dots, length_of, mxv
+from skyfield.relativity import add_aberration
 from skyfield.timelib import Timescale
 
 from .bodies import Body
@@ -31,6 +35,58 @@ ENV_VAR = "ASTRO_EPHEMERIS"
 
 class EphemerisNotFound(FileNotFoundError):
     """Ядро эфемерид не найдено."""
+
+
+#: Предел на знаменатель в формуле гравитационного отклонения.
+#:
+#: Луч, проходящий у края Солнца, отклоняется на 1.75 угловой секунды, и
+#: ближе к центру диска формула расходится как обратное угловое
+#: расстояние. Физического смысла там нет: тело просто закрыто Солнцем.
+#: Skyfield расходимость не ограничивает, и в момент соединения планеты с
+#: Солнцем это даёт скачок в двадцать угловых секунд с разрывом гладкости.
+#: Предел соответствует угловому радиусу солнечного диска.
+_DEFLECTION_LIMIT = 1.08e-5
+
+
+def _limited_deflection(position, observer_to_sun):
+    """Гравитационное отклонение света в поле Солнца, ограниченное у диска.
+
+    Формула та же, что в Skyfield и NOVAS, но знаменатель 1 + q·e снизу
+    ограничен: без этого луч, идущий «сквозь» Солнце, получает отклонение
+    в десятки угловых секунд вместо полутора.
+    """
+    pq = position + observer_to_sun
+
+    pmag = length_of(position)
+    qmag = length_of(pq)
+    emag = length_of(observer_to_sun)
+
+    phat = position / np.where(pmag, pmag, 1.0)
+    qhat = pq / np.where(qmag, qmag, 1.0)
+    ehat = observer_to_sun / np.where(emag, emag, 1.0)
+
+    pdotq = dots(phat, qhat)
+    qdote = dots(qhat, ehat)
+    edotp = dots(ehat, phat)
+
+    # Тело точно за Солнцем или точно напротив — отклонения нет.
+    flag = np.abs(edotp) <= 0.99999999999
+
+    factor = 2.0 * GS / (C * C * emag * AU_M)
+    # Ограничение сглажено: обрезка через максимум оставляла излом
+    # производной на краю диска, а интерполяция таблиц излома не любит.
+    # Вдали от Солнца поправка неразличима — предел на девять порядков
+    # меньше знаменателя.
+    denominator = np.hypot(1.0 + qdote, _DEFLECTION_LIMIT)
+
+    return flag * factor * (pdotq * ehat - edotp * qhat) / denominator * pmag
+
+
+def _plain(value):
+    """Скаляр — обычным float, массив оставляем как есть."""
+    import numpy as np
+
+    return float(value) if np.ndim(value) == 0 else value
 
 
 def _candidate_dirs() -> list[str]:
@@ -108,6 +164,7 @@ class Ephemeris:
         self.kernel = load_file(self.path)
         self.ts = timescale if timescale is not None else _timescale()
         self._earth = self.kernel[399]
+        self._sun = self.kernel[10]
         self._cache: dict[str, object] = {}
         self._small_bodies = _find_small_bodies()
 
@@ -173,10 +230,41 @@ class Ephemeris:
         система, в которой работают астрологические эфемериды.
         """
         astrometric = self._earth.at(t).observe(self.target(body))
-        lat, lon, distance = astrometric.apparent().frame_latlon(ecliptic_frame)
-        # Skyfield считает в numpy; наружу отдаём обычные float, иначе
-        # numpy-типы просачиваются до JSON и ломают сериализацию.
-        return float(norm360(lon.degrees)), float(lat.degrees), float(distance.au)
+        lat, lon, distance = self._apparent_latlon(astrometric, t)
+        # Skyfield считает в numpy; для одного момента наружу отдаются
+        # обычные float, иначе numpy-типы просачиваются до JSON и ломают
+        # сериализацию. Массив моментов остаётся массивом: им пользуется
+        # генератор таблиц для браузера.
+        return (
+            _plain(norm360(lon)),
+            _plain(lat),
+            _plain(distance),
+        )
+
+    def _apparent_latlon(self, astrometric, t):
+        """Видимые эклиптические координаты с ограниченным отклонением света.
+
+        Повторяет то, что делает ``apparent()`` у Skyfield — отклонение в
+        поле Солнца плюс годичная аберрация, — но отклонение берётся
+        ограниченным у солнечного диска. Отклонение в поле планет здесь
+        опущено: у Юпитера оно не превышает сотых долей угловой секунды.
+        """
+        position = astrometric.xyz.au.copy()
+        barycentric = astrometric.center_barycentric
+        observer = barycentric.xyz.au
+        sun = self._sun.at(t).xyz.au
+
+        position = position + _limited_deflection(position, observer - sun)
+        add_aberration(position, barycentric.velocity.au_per_d, astrometric.light_time)
+
+        # mxv умеет и один момент, и массив моментов: для массива матрица
+        # поворота трёхмерная, и обычное умножение тут не годится.
+        rotated = mxv(ecliptic_frame.rotation_at(t), position)
+        x, y, z = rotated
+        distance = length_of(rotated)
+        longitude = np.degrees(np.arctan2(y, x))
+        latitude = np.degrees(np.arcsin(z / distance))
+        return latitude, longitude, distance
 
     def position(self, body: Body, t) -> RawPosition:
         """Полное положение тела вместе со скоростью по долготе."""
@@ -200,7 +288,7 @@ class Ephemeris:
         lon_minus, _, _ = self.ecliptic(body, t_minus)
         lon_plus, _, _ = self.ecliptic(body, t_plus)
         delta = (lon_plus - lon_minus + 180.0) % 360.0 - 180.0
-        return float(delta / (2.0 * h))
+        return _plain(delta / (2.0 * h))
 
     def moon_state(self, t):
         """Геоцентрический вектор состояния Луны в эклиптике даты.

@@ -18,6 +18,8 @@ from __future__ import annotations
 import math
 from typing import Optional, Tuple
 
+import numpy as np
+
 from .bodies import Body, MEAN_LILITH, MEAN_NODE, SOUTH_NODE, TRUE_NODE
 from .ephemeris import Ephemeris, RawPosition
 from .zodiac import norm360
@@ -35,7 +37,7 @@ def _centuries(jd_tt: float) -> float:
     виде numpy-скаляра, и без него numpy-типы расходятся по всем полиномам
     и всплывают уже на сериализации результата.
     """
-    return (float(jd_tt) - J2000) / 36525.0
+    return (np.asarray(jd_tt, dtype=float) - J2000) / 36525.0
 
 
 def mean_node_longitude(jd_tt: float) -> float:
@@ -48,7 +50,8 @@ def mean_node_longitude(jd_tt: float) -> float:
         + t ** 3 / 467441.0
         - t ** 4 / 60616000.0
     )
-    return norm360(omega)
+    result = norm360(omega)
+    return float(result) if np.ndim(result) == 0 else result
 
 
 #: Модели средней Лилит.
@@ -97,10 +100,10 @@ def lunar_arguments(jd_tt: float) -> Tuple[float, float, float, float]:
         - t ** 3 / 3526000.0 + t ** 4 / 863310000.0
     )
     return (
-        math.radians(elongation),
-        math.radians(solar_anomaly),
-        math.radians(lunar_anomaly),
-        math.radians(latitude_argument),
+        np.radians(elongation),
+        np.radians(solar_anomaly),
+        np.radians(lunar_anomaly),
+        np.radians(latitude_argument),
     )
 
 
@@ -146,7 +149,8 @@ def mean_lilith_longitude(jd_tt: float, model: str = LILITH_SWISS) -> float:
 
     longitude = _polynomial_apogee(jd_tt)
     if model == LILITH_MEEUS:
-        return norm360(longitude)
+        result = norm360(longitude)
+        return float(result) if np.ndim(result) == 0 else result
 
     elongation, solar, lunar, latitude = lunar_arguments(jd_tt)
     correction = _APOGEE_CONSTANT
@@ -157,8 +161,9 @@ def mean_lilith_longitude(jd_tt: float, model: str = LILITH_SWISS) -> float:
             + factor_mp * lunar
             + factor_f * latitude
         )
-        correction += sine * math.sin(argument) + cosine * math.cos(argument)
-    return norm360(longitude + correction / 3600.0)
+        correction = correction + sine * np.sin(argument) + cosine * np.cos(argument)
+    result = norm360(longitude + correction / 3600.0)
+    return float(result) if np.ndim(result) == 0 else result
 
 
 def true_node_longitude(eph: Ephemeris, t) -> float:
@@ -167,11 +172,16 @@ def true_node_longitude(eph: Ephemeris, t) -> float:
     Узел — пересечение мгновенной плоскости орбиты Луны с эклиптикой.
     Нормаль к плоскости орбиты — момент импульса h = r × v; линия узлов
     перпендикулярна и ей, и оси эклиптики, откуда Ω = atan2(h_x, −h_y).
+
+    Работает и с одним моментом, и с массивом моментов: Skyfield считает
+    векторно, и генератор таблиц для браузера пользуется этим, вместо
+    того чтобы повторять формулу у себя.
     """
     r, v = eph.moon_state(t)
     hx = r[1] * v[2] - r[2] * v[1]
     hy = r[2] * v[0] - r[0] * v[2]
-    return norm360(math.degrees(math.atan2(hx, -hy)))
+    longitude = norm360(np.degrees(np.arctan2(hx, -hy)))
+    return float(longitude) if np.ndim(longitude) == 0 else longitude
 
 
 def _numeric_speed(fn, eph: Ephemeris, t) -> float:
