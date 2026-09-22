@@ -8,8 +8,10 @@ name: Публикация страницы
 
 on:
   push:
-    branches: [main]
-    paths: ['web/**', '.github/workflows/pages.yml']
+    # Ветка по умолчанию в этом репозитории не main, поэтому она названа
+    # явно. Если позже переименуете — поправьте и здесь.
+    branches: [claude/astro-telegram-bot-xnz1wj, main]
+    paths: ['web/**', 'content/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
