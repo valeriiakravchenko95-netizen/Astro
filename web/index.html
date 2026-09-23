@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Натальная карта — расчёт</title>
-<meta name="description" content="Расчёт натальной карты: положения планет, дома, аспекты. Считается прямо в браузере, данные никуда не отправляются.">
+<title>Натальная карта - расчет</title>
+<meta name="description" content="Расчет натальной карты: положения планет, дома, аспекты и разбор по темам. Считается прямо в браузере, данные никуда не отправляются.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +13,7 @@
 
   <header>
     <h1>Натальная карта</h1>
-    <p>Положения планет, дома и аспекты. Расчёт идёт прямо в вашем браузере — дата и место рождения никуда не отправляются.</p>
+    <p>Положения планет, дома, аспекты и разбор по темам. Расчет идет прямо в твоем браузере: дата и место рождения никуда не отправляются.</p>
   </header>
 
   <form class="card" id="form">
@@ -33,19 +33,25 @@
 
     <div class="field">
       <label for="place">Место рождения</label>
-      <input type="text" id="place" autocomplete="off" placeholder="Город — можно по-русски">
+      <input type="text" id="place" autocomplete="off" placeholder="Город, можно по-русски">
       <div class="suggest" id="suggest" hidden></div>
     </div>
 
-    <button type="submit" id="submit" disabled>Загружаю данные…</button>
+    <fieldset class="field gender">
+      <legend>Обращаться ко мне</legend>
+      <label class="check"><input type="radio" name="gender" value="f" checked> в женском роде</label>
+      <label class="check"><input type="radio" name="gender" value="m"> в мужском роде</label>
+    </fieldset>
+
+    <button type="submit" id="submit" disabled>Загружаю данные...</button>
     <p class="status" id="status"></p>
   </form>
 
   <div id="result" hidden></div>
 
   <footer>
-    <p>Расчёт по эфемеридам JPL. Ничего не сохраняется и никуда не передаётся.</p>
-    <p>Список городов — <a href="https://www.geonames.org/" rel="noopener">GeoNames</a>,
+    <p>Расчет по эфемеридам JPL. Ничего не сохраняется и никуда не передается.</p>
+    <p>Список городов: <a href="https://www.geonames.org/" rel="noopener">GeoNames</a>,
        лицензия <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener">CC BY 4.0</a>.</p>
   </footer>
 

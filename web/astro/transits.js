@@ -6,7 +6,7 @@
 
 import { MAJOR, ASPECTS } from './aspects.js';
 import { houseOf } from './houses.js';
-import { rulerOf } from './rulers.js';
+import { rulerOf, TRADITIONAL } from './rulers.js';
 import { norm180, signIndex } from './zodiac.js';
 
 // Орбисы транзитов уже натальных: планета проходит градус за дни или
@@ -25,11 +25,12 @@ export function ruledHouses(chart) {
   // Дом управляется телом, которому принадлежит знак на его куспиде.
   // Это и переводит «задета планета» в «задета тема»: транзит к
   // управителю второго дома говорит о деньгах, даже если сама планета
-  // стоит в седьмом.
+  // стоит в седьмом. Управители берутся из той же схемы, по которой
+  // построена карта.
   const cusps = chart.houses.get(chart.houseSystem).cusps;
   const mapping = new Map();
   for (let house = 1; house <= 12; house += 1) {
-    const ruler = rulerOf(signIndex(cusps[house - 1]));
+    const ruler = rulerOf(signIndex(cusps[house - 1]), chart.rulerScheme || TRADITIONAL);
     if (!mapping.has(ruler)) mapping.set(ruler, []);
     mapping.get(ruler).push(house);
   }

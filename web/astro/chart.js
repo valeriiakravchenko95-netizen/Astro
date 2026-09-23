@@ -132,6 +132,7 @@ export function computeChart(ephemeris, input) {
     patterns: findPatterns(aspects),
     stelliums: findStelliums(ordered, aspects),
     antiscia: findAntiscia(ordered, antisciaOrb),
+    rulerScheme,
     dispositors: buildDispositors(signByBody, rulerScheme),
     chartRuler: rulerOf(signIndex(angles.asc), rulerScheme),
     widths: (system) => widths(houses.get(system).cusps),

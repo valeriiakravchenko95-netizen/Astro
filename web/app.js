@@ -1,8 +1,8 @@
-// Страница расчёта: форма, поиск места, вывод карты.
+// Страница расчета: форма, поиск места, вывод карты.
 
 import { Ephemeris } from './astro/ephemeris.js';
 import { computeChart } from './astro/chart.js';
-import { DIGNITY_NAMES } from './astro/rulers.js';
+import { MODERN } from './astro/rulers.js';
 import { PLACIDUS, WHOLE_SIGN } from './astro/houses.js';
 import { formatLongitude, SIGN_GLYPHS } from './astro/zodiac.js';
 import { formatOffset } from './astro/timezone.js';
@@ -10,6 +10,7 @@ import { label, loadCities, search } from './places.js';
 import { renderReadings, loadInterpretations } from './readings.js';
 import { renderTransits, loadTransitTexts } from './transit-view.js';
 import { loadEvents } from './astro/transits.js';
+import { setGender } from './text.js';
 
 const form = document.getElementById('form');
 const dateInput = document.getElementById('date');
@@ -20,6 +21,7 @@ const suggestBox = document.getElementById('suggest');
 const submit = document.getElementById('submit');
 const status = document.getElementById('status');
 const result = document.getElementById('result');
+const genderInputs = document.querySelectorAll('input[name="gender"]');
 
 let ephemeris = null;
 let chosenPlace = null;
@@ -94,17 +96,18 @@ form.addEventListener('submit', (event) => {
   if (!ephemeris) return;
 
   if (!dateInput.value) {
-    setStatus('Укажите дату рождения', true);
+    setStatus('Укажи дату рождения', true);
     return;
   }
   if (!chosenPlace) {
-    setStatus('Выберите место из списка', true);
+    setStatus('Выбери место из списка', true);
     return;
   }
 
   const [year, month, day] = dateInput.value.split('-').map(Number);
   const exactTime = !unknownTime.checked && Boolean(timeInput.value);
   const [hour, minute] = exactTime ? timeInput.value.split(':').map(Number) : [12, 0];
+  setGender([...genderInputs].find((input) => input.checked)?.value);
 
   try {
     const chart = computeChart(ephemeris, {
@@ -114,6 +117,9 @@ form.addEventListener('submit', (event) => {
       timeZone: chosenPlace.zone,
       exactTime,
       houseSystem: PLACIDUS,
+      // Управители домов и цепочки - по современной схеме, как в методе
+      // автора трактовок: Скорпион - Плутон, Водолей - Уран, Рыбы - Нептун.
+      rulerScheme: MODERN,
     });
     setStatus('');
     render(chart, exactTime);
@@ -154,14 +160,14 @@ function render(chart, exactTime) {
     head.append(element('div', 'warn',
       'Время рождения неизвестно, карта посчитана на полдень. Положения по '
       + 'знакам верны, но Луна за сутки проходит до 15°, а дома и Асцендент '
-      + 'зависят от минут — их здесь нет.'));
+      + 'зависят от минут - их здесь нет.'));
   } else if (local.imaginary) {
     head.append(element('div', 'warn',
-      'В этот день стрелки переводили вперёд, и указанного часа не '
-      + 'существовало. Проверьте время.'));
+      'В этот день стрелки переводили вперед, и указанного часа не '
+      + 'существовало. Проверь время.'));
   } else if (local.ambiguous) {
     head.append(element('div', 'warn',
-      'В этот день стрелки переводили назад, и такой час прошёл дважды. '
+      'В этот день стрелки переводили назад, и такой час прошел дважды. '
       + 'Взят первый.'));
   }
   result.append(head);
@@ -169,7 +175,6 @@ function render(chart, exactTime) {
   result.append(renderPositions(chart, exactTime));
   if (exactTime) result.append(renderAngles(chart));
   result.append(renderAspects(chart));
-  if (chart.dignities.size) result.append(renderDignities(chart));
   if (chart.patterns.length || chart.stelliums.length) result.append(renderPatterns(chart));
 
   const transits = renderTransits(chart, { exactTime });
@@ -195,12 +200,12 @@ function renderPositions(chart, exactTime) {
     table.append(row);
   }
   node.append(table);
-  if (exactTime) node.append(element('p', 'note', 'Последний столбец — дом. R — попятное движение, S — стоянка.'));
+  if (exactTime) node.append(element('p', 'note', 'Последний столбец - дом. R - попятное движение, S - стоянка.'));
   return node;
 }
 
 function renderAngles(chart) {
-  const node = card(`Углы и дома — ${chart.houseSystemName}`);
+  const node = card(`Углы и дома - ${chart.houseSystemName}`);
   const table = element('table');
   const angles = [['ASC', chart.angles.asc], ['MC', chart.angles.mc],
     ['DSC', chart.angles.desc], ['IC', chart.angles.ic]];
@@ -241,25 +246,7 @@ function renderAspects(chart) {
     table.append(row);
   }
   node.append(table);
-  node.append(element('p', 'note', 'Орб — отклонение от точного угла. → аспект сходится, ← расходится.'));
-  return node;
-}
-
-function renderDignities(chart) {
-  const node = card(`Достоинства — карта ${chart.diurnal ? 'дневная' : 'ночная'}`);
-  const table = element('table');
-  for (const [key, item] of chart.dignities) {
-    const body = chart.positions.get(key).body;
-    const own = item.peregrine
-      ? 'перегрин'
-      : item.own.map((code) => DIGNITY_NAMES[code]).join(', ');
-    const row = element('tr');
-    row.append(element('td', 'glyph', body.glyph));
-    row.append(element('td', 'name', body.short));
-    row.append(element('td', 'note', own));
-    table.append(row);
-  }
-  node.append(table);
+  node.append(element('p', 'note', 'Орб - отклонение от точного угла. → аспект сходится, ← расходится.'));
   return node;
 }
 

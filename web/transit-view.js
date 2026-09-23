@@ -1,16 +1,19 @@
 // Раздел «Сейчас в небе»: событие и то, как оно задевает карту.
 
 import { examine, eventsAround, findEvent } from './astro/transits.js';
-import { formatLongitude, SIGN_GLYPHS } from './astro/zodiac.js';
+import { formatLongitude } from './astro/zodiac.js';
+import { textNodes } from './text.js';
 
-let content = { events: {}, contacts: {}, houses: {}, featured: null };
+let content = {
+  events: {}, contacts: {}, points: {}, forms: {}, houses: {}, house_details: {}, featured: null,
+};
 
 export async function loadTransitTexts(url = 'content/transits.json') {
   try {
     const response = await fetch(url);
     if (response.ok) content = { ...content, ...(await response.json()) };
   } catch (error) {
-    // Без текстов раздел всё равно полезен: видно, задевает или нет.
+    // Без текстов раздел все равно полезен: видно, задевает или нет.
   }
   return content;
 }
@@ -35,7 +38,7 @@ function element(tag, className, text) {
 }
 
 // Какое событие показывать. Ссылка вида ?event=station.uranus.retrograde
-// или с датой через собаку — так пост в ленте ведёт ровно на то событие,
+// или с датой через собаку - так пост в ленте ведет ровно на то событие,
 // о котором рассказывали.
 function chooseEvent(events) {
   const asked = new URLSearchParams(location.search).get('event');
@@ -50,15 +53,25 @@ function chooseEvent(events) {
   return past.length ? past[past.length - 1] : events[0];
 }
 
+// Текст касания. Если под точным ключом («square.venus», «cusp.10») текста
+// нет, он собирается из двух кусков: что в карте задето (points) и как
+// идет касание (forms). Для куспида - из названия темы дома.
 function contactText(hit) {
   if (hit.natalKind === 'cusp') {
-    return content.contacts?.[`cusp.${hit.house}`] || '';
+    const exact = content.contacts?.[`cusp.${hit.house}`];
+    if (exact) return exact;
+    const theme = content.houses?.[String(hit.house)];
+    return theme ? `Градус приходится на самое начало темы: ${theme}.` : '';
   }
-  return content.contacts?.[`${hit.aspect.key}.${hit.natal}`] || '';
+  const exact = content.contacts?.[`${hit.aspect.key}.${hit.natal}`];
+  if (exact) return exact;
+  const point = content.points?.[hit.natal];
+  const form = content.forms?.[hit.aspect.key];
+  return point && form ? `${point}\n\n${form}` : '';
 }
 
 function nameOf(chart, hit) {
-  if (hit.natalKind === 'cusp') return `куспид ${hit.house} дома`;
+  if (hit.natalKind === 'cusp') return `начало ${hit.house} дома`;
   if (hit.natal === 'asc') return 'Асцендент';
   if (hit.natal === 'mc') return 'МС';
   return chart.positions.get(hit.natal)?.body.name || hit.natal;
@@ -88,13 +101,13 @@ export function renderTransits(chart, { exactTime }) {
     body.append(heading, when);
 
     const about = content.events?.[event.key];
-    if (about) body.append(element('p', null, about));
+    if (about) body.append(...textNodes(about));
 
     const report = examine(chart, event.longitude, event.title);
 
     if (!report.touches) {
       body.append(element('p', 'note',
-        'Вашей карты это событие не задевает: ни одна планета и ни один '
+        'Твоей карты это событие не задевает: ни одна планета и ни один '
         + 'угол не попадают в орбис.'));
       return;
     }
@@ -119,31 +132,37 @@ export function renderTransits(chart, { exactTime }) {
     }
     if (report.hits.length) {
       body.append(table);
-      body.append(element('p', 'note', 'Восклицательный знак — контакт точный.'));
+      body.append(element('p', 'note', 'Восклицательный знак - касание точное.'));
     }
 
     for (const hit of report.hits) {
       const written = contactText(hit);
       if (!written) continue;
       const item = element('div', 'reading');
-      item.append(element('h3', null,
-        `${event.bodies.length ? event.title.split(' ')[0] : 'Транзит'} `
-        + `${hit.aspect.name.toLowerCase()} — ваш ${nameOf(chart, hit)}`));
-      item.append(element('p', null, written));
+      item.append(element('h3', null, hit.natalKind === 'cusp'
+        ? `Касается: ${nameOf(chart, hit)}`
+        : `Касается: ${nameOf(chart, hit)}, ${hit.aspect.name.toLowerCase()}`));
+      item.append(...textNodes(written));
       body.append(item);
     }
 
     if (exactTime && report.housesTouched.length) {
       const themes = element('div', 'reading');
-      themes.append(element('h3', null, 'Каких тем это касается'));
-      const list = report.housesTouched
-        .map((house) => content.houses?.[String(house)] || `${house} дом`)
-        .join(' · ');
-      themes.append(element('p', null, list));
+      themes.append(element('h3', null, 'Каких сфер жизни это касается'));
+      const list = element('ul', 'themes');
+      for (const house of report.housesTouched) {
+        const name = content.houses?.[String(house)] || `${house} дом`;
+        const details = content.house_details?.[String(house)];
+        const item = element('li');
+        item.append(element('strong', null, name));
+        if (details) item.append(document.createTextNode(`: ${details}`));
+        list.append(item);
+      }
+      themes.append(list);
       body.append(themes);
     } else if (!exactTime) {
       body.append(element('p', 'note',
-        'Без точного времени рождения видно только контакты с планетами: '
+        'Без точного времени рождения видно только касания планет: '
         + 'дома и углы зависят от минут.'));
     }
   };

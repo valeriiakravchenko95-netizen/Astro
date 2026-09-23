@@ -60,7 +60,7 @@ function placidusCusp(house, ramc, obliquity, latitude) {
       if (Math.abs(step) < TOLERANCE) return value;
     }
   }
-  throw new Error(`куспид ${house} дома не сошёлся`);
+  throw new Error(`куспид ${house} дома не сошелся`);
 }
 
 export function wholeSign(asc) {
@@ -88,7 +88,7 @@ export function porphyry(asc, mc) {
 export function placidus(angles, latitude) {
   if (Math.abs(latitude) >= 90 - angles.obliquity) {
     throw new CircumpolarError(
-      `широта ${latitude.toFixed(4)}° за полярным кругом: Плацидус там не определён`,
+      `широта ${latitude.toFixed(4)}° за полярным кругом: Плацидус там не определен`,
     );
   }
   const cusp11 = placidusCusp(11, angles.ramc, angles.obliquity, latitude);

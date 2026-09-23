@@ -5,7 +5,8 @@
 // «Меркурий в 12 доме, управитель 9-го» — у одного из двухсот. Скрипт
 // прогоняет много правдоподобных карт через ту же отборку факторов, что
 // работает на странице, и показывает ключи по убыванию частоты вместе с
-// накопленным охватом: сколько посетителей увидят хоть что-то написанное.
+// долей карточек, у которых уже есть текст. Написанные ключи в списке
+// пропускаются: он показывает, что писать дальше.
 //
 //   node scripts/priority.mjs                 # все темы
 //   node scripts/priority.mjs money 40        # одна тема, сорок строк
@@ -34,6 +35,7 @@ globalThis.fetch = async (url) => {
 
 const { Ephemeris } = await import(path.join(web, 'astro/ephemeris.js'));
 const { computeChart } = await import(path.join(web, 'astro/chart.js'));
+const { MODERN } = await import(path.join(web, 'astro/rulers.js'));
 const { collectFactors, loadInterpretations } = await import(path.join(web, 'readings.js'));
 
 // Правдоподобная аудитория: взрослые люди, большие города, известное время.
@@ -86,7 +88,7 @@ while (charts.length < COUNT) {
   const minute = Math.floor(random() * 60);
   try {
     charts.push(computeChart(ephemeris, {
-      year, month, day, hour, minute, ...place,
+      year, month, day, hour, minute, ...place, rulerScheme: MODERN,
     }));
   } catch (error) {
     // Карта вне интервала таблиц — просто берём следующую.
@@ -95,19 +97,36 @@ while (charts.length < COUNT) {
 
 const written = (section, id) => Boolean(content.texts?.[section]?.[id]);
 
+// Что писать под фактор. Если у него есть точный текст - он и есть ключ.
+// Иначе фактор собирается из кусков, и писать нужно куски: так один текст
+// «управитель 2 дома в 10» закрывает все планеты, которые могут управлять.
+function unitsOf(factor) {
+  if (written(factor.section, factor.id) || !factor.parts?.length) {
+    return [{ section: factor.section, id: factor.id, title: factor.title }];
+  }
+  return factor.parts.map((piece) => ({
+    section: piece.section, id: piece.key, title: `${factor.title} (${piece.section})`,
+  }));
+}
+
+const shows = (factor) => unitsOf(factor).some((unit) => written(unit.section, unit.id));
+
 for (const topic of topics) {
   const counts = new Map();
   const titles = new Map();
-  // Сколько карт вообще имеют хоть один фактор этой темы.
-  let chartsWithAny = 0;
+  let factorsTotal = 0;
+  let factorsShown = 0;
 
   for (const chart of charts) {
     const factors = collectFactors(chart, topic.key, true);
-    if (factors.length) chartsWithAny += 1;
     for (const factor of factors) {
-      const key = `${factor.section}\u0000${factor.id}`;
-      counts.set(key, (counts.get(key) || 0) + 1);
-      if (!titles.has(key)) titles.set(key, factor.title);
+      factorsTotal += 1;
+      if (shows(factor)) factorsShown += 1;
+      for (const unit of unitsOf(factor)) {
+        const key = `${unit.section}\u0000${unit.id}`;
+        counts.set(key, (counts.get(key) || 0) + 1);
+        if (!titles.has(key)) titles.set(key, unit.title);
+      }
     }
   }
 
@@ -121,13 +140,14 @@ for (const topic of topics) {
   const done = rows.filter((row) => row.done).length;
   console.log(`\n=== ${topic.name} ===`);
   console.log(`всего разных ключей: ${rows.length}, написано: ${done}`);
+  console.log(`карточек с текстом: ${((factorsShown / Math.max(1, factorsTotal)) * 100).toFixed(0)} % `
+    + `(на ${charts.length} картах)`);
   console.log(`${'ключ'.padEnd(34)} ${'встретится'.padStart(11)}  пример`);
 
   // Накопленный охват: доля карт, где встретится хоть один из ключей
   // сверху списка. Считается честно — по картам, а не сложением частот.
-  const covered = new Set();
   let shown = 0;
-  for (const row of rows) {
+  for (const row of rows.filter((item) => !item.done || LIMIT > rows.length)) {
     if (shown >= LIMIT) break;
     shown += 1;
     const share = (row.count / charts.length) * 100;
@@ -137,16 +157,4 @@ for (const topic of topics) {
     );
   }
 
-  // Охват первых N ключей — главный ответ на вопрос «сколько писать».
-  for (const limit of [10, 25, 50, 100]) {
-    if (limit > rows.length) break;
-    const top = new Set(rows.slice(0, limit).map((row) => `${row.section}\u0000${row.id}`));
-    let hit = 0;
-    for (const chart of charts) {
-      const factors = collectFactors(chart, topic.key, true);
-      if (factors.some((factor) => top.has(`${factor.section}\u0000${factor.id}`))) hit += 1;
-    }
-    console.log(`  первые ${String(limit).padStart(3)} ключей увидит ${((hit / charts.length) * 100).toFixed(0)} % посетителей`);
-  }
-  void chartsWithAny;
 }

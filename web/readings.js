@@ -1,13 +1,14 @@
 // Темы и трактовки.
 //
-// Карта считается целиком, но показывать целиком её незачем: под каждую
+// Карта считается целиком, но показывать целиком ее незачем: под каждую
 // тему из карты выбирается несколько значимых мест, и к ним подбирается
-// текст. И темы, и тексты лежат в content/interpretations.json — код
+// текст. И темы, и тексты лежат в content/interpretations.json - код
 // знает только, как достать из карты фактор каждого вида, а какие именно
 // факторы входят в тему, решает файл. Новая тема не требует правки кода.
 
 import { SIGNS_IN, signIndex, toSign } from './astro/zodiac.js';
-import { DIGNITY_NAMES, rulerOf } from './astro/rulers.js';
+import { rulerOf, TRADITIONAL } from './astro/rulers.js';
+import { textNodes } from './text.js';
 
 let content = { topics: [], texts: {} };
 
@@ -16,7 +17,7 @@ export async function loadInterpretations(url = 'content/interpretations.json') 
     const response = await fetch(url);
     if (response.ok) content = await response.json();
   } catch (error) {
-    // Без трактовок страница остаётся полезной: цифры никуда не делись.
+    // Без трактовок страница остается полезной: цифры никуда не делись.
     content = { topics: [], texts: {} };
   }
   return content;
@@ -29,11 +30,32 @@ function text(section, key) {
 const bodyName = (chart, key) => chart.positions.get(key)?.body.name || key;
 const shortName = (chart, key) => chart.positions.get(key)?.body.short || key;
 
+// Десять планет. Узлы, Лилит, Хирон и жребии в составных текстах не
+// участвуют: по методу они окрашивают вывод, а не делают его.
+const PLANETS = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter',
+  'saturn', 'uranus', 'neptune', 'pluto'];
+
+const ELEMENTS = ['Огонь', 'Земля', 'Воздух', 'Вода'];
+
+const where = (chart, key) => {
+  const position = chart.positions.get(key);
+  return `${position.body.name} в ${SIGNS_IN[position.sign.index]}`
+    + (chart.exactTime === false ? '' : ` в ${position.house} доме`);
+};
+
+// Кусок текста фактора: ключ, по которому он лежит в файле, и подпись,
+// если кусков в одном факторе несколько.
+const part = (section, key, label = null) => ({ section, key, label });
+
 // --- как достать из карты фактор каждого вида -------------------------------
 //
 // Каждый вид получает карту, признак известного времени и описание из файла,
-// а возвращает либо готовый фактор, либо ничего — если в этой карте такого
+// а возвращает либо готовый фактор, либо ничего - если в этой карте такого
 // нет или для него не хватает времени рождения.
+//
+// У фактора есть точный ключ (section + id): если под ним в файле лежит
+// текст, берется он. Если нет, фактор может собрать текст из кусков
+// (parts) - так не нужно писать отдельный текст на каждое сочетание.
 
 const FACTOR_KINDS = {
   planet_sign(chart, exactTime, spec) {
@@ -43,7 +65,7 @@ const FACTOR_KINDS = {
       id: `${spec.body}.${position.sign.index}`,
       section: 'planet_in_sign',
       title: `${position.body.name} в ${SIGNS_IN[position.sign.index]}`,
-      where: position.sign.sign,
+      where: 'знак',
     };
   },
 
@@ -55,26 +77,27 @@ const FACTOR_KINDS = {
       id: `${spec.body}.${position.house}`,
       section: 'planet_in_house',
       title: `${position.body.name} в ${position.house} доме`,
-      where: `${position.house} дом`,
+      where: 'дом',
     };
   },
 
-  // Дом говорит о чём, управитель — через что. Это основной способ читать
-  // тему дома, и он работает даже когда в самом доме пусто.
+  // Дом говорит о чем, управитель - через что. Это основной способ читать
+  // тему дома, и он работает даже когда в самом доме пусто. Управитель
+  // берется по той схеме, по которой построена карта.
   house_ruler(chart, exactTime, spec) {
     if (!exactTime) return null;
     const cusps = chart.houses.get(chart.houseSystem).cusps;
     const sign = signIndex(cusps[spec.house - 1]);
-    const ruler = rulerOf(sign);
+    const ruler = rulerOf(sign, chart.rulerScheme || TRADITIONAL);
     const position = chart.positions.get(ruler);
     if (!position) return null;
     return {
       id: `${spec.house}.${ruler}.${position.house}`,
       section: 'house_ruler',
-      title: `${spec.house} дом в ${SIGNS_IN[sign]}, управитель ${position.body.name} в ${position.house} доме`,
-      where: `${spec.house} дом`,
-      fallback: `Тема ${spec.house} дома идёт через ${position.body.name} — он стоит `
-        + `в ${position.house} доме, в ${SIGNS_IN[position.sign.index]}.`,
+      title: `${spec.house} дом в ${SIGNS_IN[sign]}, его управитель ${position.body.name} `
+        + `в ${SIGNS_IN[position.sign.index]} в ${position.house} доме`,
+      where: 'управитель дома',
+      parts: [part('ruler_in_house', `${spec.house}.${position.house}`)],
     };
   },
 
@@ -84,12 +107,14 @@ const FACTOR_KINDS = {
       .filter(([, position]) => position.house === spec.house)
       .map(([key]) => key);
     if (!inside.length) return null;
+    const own = inside.filter((key) => PLANETS.includes(key) || key.endsWith('_node'));
     return {
       id: `${spec.house}.${inside.join('-')}`,
       section: 'planets_in_house',
       title: `В ${spec.house} доме: ${inside.map((key) => bodyName(chart, key)).join(', ')}`,
-      where: `${spec.house} дом`,
-      fallback: `В ${spec.house} доме стоят: ${inside.map((key) => bodyName(chart, key)).join(', ')}.`,
+      where: 'дом',
+      parts: own.map((key) => part('planet_in_house', `${key}.${spec.house}`,
+        own.length > 1 ? bodyName(chart, key) : null)),
     };
   },
 
@@ -103,21 +128,23 @@ const FACTOR_KINDS = {
       id: `${[spec.a, spec.b].sort().join('.')}.${hit.aspect.key}`,
       section: 'aspect',
       title: `${shortName(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${shortName(chart, hit.bodyB)}`,
-      where: `орб ${hit.orb.toFixed(1)}°`,
+      where: 'связь двух планет',
     };
   },
 
+  // Свой знак или знак экзальтации. Названия достоинств на страницу не
+  // выводятся: текст описывает, как это работает, а не ставит оценку.
   dignity(chart, exactTime, spec) {
     const item = chart.dignities.get(spec.body);
     if (!item) return null;
     const strong = item.own.filter((code) => code === 'domicile' || code === 'exaltation');
     if (!strong.length) return null;
+    const position = chart.positions.get(spec.body);
     return {
       id: `${spec.body}.${strong[0]}`,
       section: 'dignity',
-      title: `${bodyName(chart, spec.body)}: ${DIGNITY_NAMES[strong[0]]}`,
-      where: 'достоинство',
-      fallback: `${bodyName(chart, spec.body)} стоит сильно — это ${DIGNITY_NAMES[strong[0]]}.`,
+      title: `${position.body.name} в ${SIGNS_IN[position.sign.index]}`,
+      where: 'знак',
     };
   },
 
@@ -143,38 +170,51 @@ const FACTOR_KINDS = {
     };
   },
 
-  // Финальный диспозитор — планета, к которой сходятся все цепочки
-  // управления. Если он есть, им обычно и объясняется склад карты.
+  // Центр карты - планета в своем знаке, к которой сходятся цепочки
+  // управления других планет. Планета в своем знаке, к которой не
+  // сходится ничего, самодостаточна, но центром не считается.
   final_dispositor(chart) {
-    const finals = chart.dispositors.finalDispositors;
-    if (!finals.length) return null;
+    const { finalDispositors, terminal } = chart.dispositors;
+    const centres = finalDispositors.filter((body) => PLANETS.some(
+      (other) => other !== body && terminal.get(other)?.length === 1
+        && terminal.get(other)[0] === body,
+    ));
+    if (!centres.length) return null;
+    const all = centres.length === 1 && PLANETS.every(
+      (other) => terminal.get(other)?.[0] === centres[0],
+    );
     return {
-      id: finals.join('-'),
+      id: centres.join('-'),
       section: 'final_dispositor',
-      title: finals.length === 1
-        ? `Финальный диспозитор: ${bodyName(chart, finals[0])}`
-        : `Финальные диспозиторы: ${finals.map((key) => bodyName(chart, key)).join(', ')}`,
-      where: 'цепочки управления',
-      fallback: `Все цепочки управления в карте сходятся к ${finals.map((key) => bodyName(chart, key)).join(' и ')}.`,
+      title: `${centres.length === 1 ? 'Центр карты' : 'Центры карты'}: `
+        + centres.map((key) => where(chart, key)).join('; '),
+      where: centres.length > 1 ? 'к ним сходятся цепочки управления'
+        : `к нему сходятся ${all ? 'все ' : ''}цепочки управления`,
+      parts: centres.map((key) => part('final_dispositor', key,
+        centres.length > 1 ? bodyName(chart, key) : null)),
     };
   },
 
   elements(chart) {
-    const counts = { Огонь: 0, Земля: 0, Воздух: 0, Вода: 0 };
+    const counts = Object.fromEntries(ELEMENTS.map((name) => [name, 0]));
     for (const [key, position] of chart.positions) {
-      if (!['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn'].includes(key)) continue;
+      if (!PLANETS.slice(0, 7).includes(key)) continue;
       counts[position.sign.element] += 1;
     }
-    const order = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    const missing = order.filter(([, count]) => count === 0).map(([name]) => name);
+    const order = ELEMENTS.map((name) => [name, counts[name]]).sort((a, b) => b[1] - a[1]);
+    const top = order.filter(([, count]) => count === order[0][1]);
+    const missing = order.filter(([, count]) => count === 0);
     return {
       id: order.map(([name, count]) => `${name}${count}`).join('-'),
       section: 'elements',
-      title: `Стихии: ${order.map(([name, count]) => `${name} ${count}`).join(', ')}`,
-      where: 'по семи планетам',
-      fallback: missing.length
-        ? `Больше всего ${order[0][0].toLowerCase()}а. Не набрано ни одной планеты в стихии: ${missing.join(', ').toLowerCase()}.`
-        : `Больше всего ${order[0][0].toLowerCase()}а, меньше всего ${order[order.length - 1][0].toLowerCase()}ы.`,
+      title: order.map(([name, count]) => `${name} ${count}`).join(' · '),
+      where: 'по семи личным планетам',
+      parts: [
+        ...top.map(([name]) => part('elements', `dominant.${name}`,
+          top.length > 1 || missing.length ? `Больше всего: ${name.toLowerCase()}` : null)),
+        ...missing.map(([name]) => part('elements', `missing.${name}`,
+          `Ни одной: ${name.toLowerCase()}`)),
+      ],
     };
   },
 };
@@ -227,20 +267,46 @@ export function renderReadings(chart, { exactTime }) {
       body.append(empty);
       return;
     }
+    // Один и тот же текст внутри темы показывается один раз: Венера во
+    // втором доме может прийти и как «планета в доме», и как «кто стоит
+    // во втором доме».
+    const shown = new Set();
     for (const factor of factors) {
+      const own = text(factor.section, factor.id);
+      const candidates = own
+        ? [{ section: factor.section, key: factor.id, raw: own }]
+        : (factor.parts || []).map((piece) => ({ ...piece, raw: text(piece.section, piece.key) }));
+      const pieces = [];
+      let repeated = false;
+      for (const piece of candidates) {
+        const mark = `${piece.section}:${piece.key}`;
+        if (!piece.raw) continue;
+        if (shown.has(mark)) {
+          repeated = true;
+          continue;
+        }
+        shown.add(mark);
+        pieces.push(piece);
+      }
+      // Все, что было сказать, уже сказано выше - карточку не повторяем.
+      if (!pieces.length && repeated) continue;
+
       const item = document.createElement('div');
       item.className = 'reading';
       const title = document.createElement('h3');
       title.textContent = factor.title;
-      const where = document.createElement('p');
-      where.className = 'where';
-      where.textContent = factor.where;
-      const paragraph = document.createElement('p');
-      const written = text(factor.section, factor.id);
-      paragraph.textContent = written || factor.fallback || '';
-      if (!paragraph.textContent) paragraph.className = 'note';
-      item.append(title, where);
-      if (paragraph.textContent) item.append(paragraph);
+      const note = document.createElement('p');
+      note.className = 'where';
+      note.textContent = factor.where;
+      item.append(title, note);
+      for (const piece of pieces) {
+        if (piece.label) {
+          const label = document.createElement('h4');
+          label.textContent = piece.label;
+          item.append(label);
+        }
+        item.append(...textNodes(piece.raw));
+      }
       body.append(item);
     }
   };
