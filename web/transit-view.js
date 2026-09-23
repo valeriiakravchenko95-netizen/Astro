@@ -132,7 +132,9 @@ export function renderTransits(chart, { exactTime }) {
     }
     if (report.hits.length) {
       body.append(table);
-      body.append(element('p', 'note', 'Восклицательный знак - касание точное.'));
+      if (report.hits.some((hit) => hit.exact)) {
+        body.append(element('p', 'note', 'Восклицательный знак - касание точное.'));
+      }
     }
 
     for (const hit of report.hits) {

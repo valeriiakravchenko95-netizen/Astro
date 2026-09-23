@@ -106,8 +106,9 @@ const FACTOR_KINDS = {
     const inside = [...chart.positions.entries()]
       .filter(([, position]) => position.house === spec.house)
       .map(([key]) => key);
-    if (!inside.length) return null;
+    // Лилит, Хирон и жребии в доме без планет отдельной карточки не дают.
     const own = inside.filter((key) => PLANETS.includes(key) || key.endsWith('_node'));
+    if (!own.length) return null;
     return {
       id: `${spec.house}.${inside.join('-')}`,
       section: 'planets_in_house',
@@ -202,8 +203,12 @@ const FACTOR_KINDS = {
       counts[position.sign.element] += 1;
     }
     const order = ELEMENTS.map((name) => [name, counts[name]]).sort((a, b) => b[1] - a[1]);
-    const top = order.filter(([, count]) => count === order[0][1]);
+    // Преобладание есть, когда первое место делят не больше двух. Ровный
+    // счет без пустых мест ничего особенного не говорит - карточки нет.
+    const leaders = order.filter(([, count]) => count === order[0][1]);
+    const top = leaders.length <= 2 ? leaders : [];
     const missing = order.filter(([, count]) => count === 0);
+    if (!top.length && !missing.length) return null;
     return {
       id: order.map(([name, count]) => `${name}${count}`).join('-'),
       section: 'elements',
