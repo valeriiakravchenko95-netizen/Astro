@@ -1,44 +1,215 @@
 {
-  "_прочтите": "Тексты трактовок правятся прямо здесь, код трогать не нужно. Ключи описаны в content/README.md. Пустой или отсутствующий текст просто не показывается — карта от этого не ломается.",
+  "_прочтите": "Темы и тексты правятся здесь, код трогать не нужно. Как добавить тему и какие бывают виды факторов — в content/README.md.",
   "topics": [
     {
       "key": "character",
-      "name": "Характер"
+      "name": "Характер",
+      "factors": [
+        {
+          "type": "ascendant"
+        },
+        {
+          "type": "planet_sign",
+          "body": "sun"
+        },
+        {
+          "type": "planet_house",
+          "body": "sun"
+        },
+        {
+          "type": "planet_sign",
+          "body": "moon"
+        },
+        {
+          "type": "planet_house",
+          "body": "moon"
+        },
+        {
+          "type": "planet_sign",
+          "body": "mercury"
+        },
+        {
+          "type": "aspect",
+          "a": "sun",
+          "b": "moon"
+        },
+        {
+          "type": "elements"
+        },
+        {
+          "type": "final_dispositor"
+        },
+        {
+          "type": "dignity",
+          "body": "sun"
+        },
+        {
+          "type": "dignity",
+          "body": "moon"
+        }
+      ]
     },
     {
       "key": "money",
-      "name": "Деньги и работа"
+      "name": "Деньги и работа",
+      "factors": [
+        {
+          "type": "house_ruler",
+          "house": 2
+        },
+        {
+          "type": "planets_in_house",
+          "house": 2
+        },
+        {
+          "type": "house_ruler",
+          "house": 10
+        },
+        {
+          "type": "planets_in_house",
+          "house": 10
+        },
+        {
+          "type": "midheaven"
+        },
+        {
+          "type": "house_ruler",
+          "house": 6
+        },
+        {
+          "type": "planet_sign",
+          "body": "venus"
+        },
+        {
+          "type": "planet_house",
+          "body": "venus"
+        },
+        {
+          "type": "planet_sign",
+          "body": "jupiter"
+        },
+        {
+          "type": "planet_house",
+          "body": "jupiter"
+        },
+        {
+          "type": "planet_sign",
+          "body": "saturn"
+        },
+        {
+          "type": "planet_house",
+          "body": "saturn"
+        },
+        {
+          "type": "dignity",
+          "body": "venus"
+        },
+        {
+          "type": "dignity",
+          "body": "jupiter"
+        }
+      ]
     },
     {
       "key": "relations",
-      "name": "Отношения"
+      "name": "Отношения",
+      "factors": [
+        {
+          "type": "house_ruler",
+          "house": 7
+        },
+        {
+          "type": "planets_in_house",
+          "house": 7
+        },
+        {
+          "type": "house_ruler",
+          "house": 5
+        },
+        {
+          "type": "planet_sign",
+          "body": "venus"
+        },
+        {
+          "type": "planet_house",
+          "body": "venus"
+        },
+        {
+          "type": "planet_sign",
+          "body": "mars"
+        },
+        {
+          "type": "planet_house",
+          "body": "mars"
+        },
+        {
+          "type": "planet_sign",
+          "body": "moon"
+        },
+        {
+          "type": "aspect",
+          "a": "venus",
+          "b": "mars"
+        },
+        {
+          "type": "aspect",
+          "a": "moon",
+          "b": "venus"
+        },
+        {
+          "type": "aspect",
+          "a": "venus",
+          "b": "saturn"
+        }
+      ]
     },
     {
       "key": "purpose",
-      "name": "Предназначение"
+      "name": "Предназначение",
+      "factors": [
+        {
+          "type": "planet_sign",
+          "body": "true_node"
+        },
+        {
+          "type": "planet_house",
+          "body": "true_node"
+        },
+        {
+          "type": "planet_sign",
+          "body": "south_node"
+        },
+        {
+          "type": "planet_house",
+          "body": "south_node"
+        },
+        {
+          "type": "midheaven"
+        },
+        {
+          "type": "house_ruler",
+          "house": 10
+        },
+        {
+          "type": "house_ruler",
+          "house": 9
+        },
+        {
+          "type": "final_dispositor"
+        }
+      ]
     }
   ],
   "texts": {
-    "planet_in_sign": {
-      "sun.0": "",
-      "moon.3": "",
-      "venus.1": ""
-    },
-    "planet_in_house": {
-      "sun.10": "",
-      "moon.4": ""
-    },
-    "ascendant": {
-      "asc.6": ""
-    },
-    "aspect": {
-      "moon.sun.square": "",
-      "mars.venus.conjunction": ""
-    },
-    "dignity": {
-      "sun.domicile": "",
-      "venus.exaltation": ""
-    },
-    "house_ruler": {}
+    "planet_in_sign": {},
+    "planet_in_house": {},
+    "planets_in_house": {},
+    "house_ruler": {},
+    "ascendant": {},
+    "midheaven": {},
+    "aspect": {},
+    "dignity": {},
+    "final_dispositor": {},
+    "elements": {}
   }
 }

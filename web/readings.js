@@ -2,11 +2,12 @@
 //
 // Карта считается целиком, но показывать целиком её незачем: под каждую
 // тему из карты выбирается несколько значимых мест, и к ним подбирается
-// текст. Сами тексты лежат в content/interpretations.json и правятся без
-// участия кода — здесь только выбор того, о чём говорить.
+// текст. И темы, и тексты лежат в content/interpretations.json — код
+// знает только, как достать из карты фактор каждого вида, а какие именно
+// факторы входят в тему, решает файл. Новая тема не требует правки кода.
 
-import { SIGNS, SIGNS_IN, signIndex, toSign } from './astro/zodiac.js';
-import { DIGNITY_NAMES } from './astro/rulers.js';
+import { SIGNS_IN, signIndex, toSign } from './astro/zodiac.js';
+import { DIGNITY_NAMES, rulerOf } from './astro/rulers.js';
 
 let content = { topics: [], texts: {} };
 
@@ -25,159 +26,174 @@ function text(section, key) {
   return content.texts?.[section]?.[key] || '';
 }
 
-const bodyName = (chart, key) => chart.positions.get(key)?.body.short || key;
+const bodyName = (chart, key) => chart.positions.get(key)?.body.name || key;
+const shortName = (chart, key) => chart.positions.get(key)?.body.short || key;
 
-// --- отбор значимых мест карты ---------------------------------------------
+// --- как достать из карты фактор каждого вида -------------------------------
+//
+// Каждый вид получает карту, признак известного времени и описание из файла,
+// а возвращает либо готовый фактор, либо ничего — если в этой карте такого
+// нет или для него не хватает времени рождения.
 
-function planetInSign(chart, key) {
-  const position = chart.positions.get(key);
-  if (!position) return null;
-  const sign = SIGNS[position.sign.index];
-  return {
-    id: `${key}.${position.sign.index}`,
-    section: 'planet_in_sign',
-    title: `${position.body.name} в ${SIGNS_IN[position.sign.index]}`,
-    where: sign,
-  };
-}
+const FACTOR_KINDS = {
+  planet_sign(chart, exactTime, spec) {
+    const position = chart.positions.get(spec.body);
+    if (!position) return null;
+    return {
+      id: `${spec.body}.${position.sign.index}`,
+      section: 'planet_in_sign',
+      title: `${position.body.name} в ${SIGNS_IN[position.sign.index]}`,
+      where: position.sign.sign,
+    };
+  },
 
-function planetInHouse(chart, key, exactTime) {
-  if (!exactTime) return null;
-  const position = chart.positions.get(key);
-  if (!position) return null;
-  return {
-    id: `${key}.${position.house}`,
-    section: 'planet_in_house',
-    title: `${position.body.name} в ${position.house} доме`,
-    where: `${position.house} дом`,
-  };
-}
+  planet_house(chart, exactTime, spec) {
+    if (!exactTime) return null;
+    const position = chart.positions.get(spec.body);
+    if (!position) return null;
+    return {
+      id: `${spec.body}.${position.house}`,
+      section: 'planet_in_house',
+      title: `${position.body.name} в ${position.house} доме`,
+      where: `${position.house} дом`,
+    };
+  },
 
-// Управитель дома и место, куда он поставлен, — основной способ читать
-// тему дома: дом говорит о чём, управитель — через что.
-function houseRuler(chart, house, exactTime) {
-  if (!exactTime) return null;
-  const cusps = chart.houses.get(chart.houseSystem).cusps;
-  const sign = signIndex(cusps[house - 1]);
-  const ruler = content.rulers?.[sign] ?? null;
-  const rulerKey = ruler || rulerOfSign(chart, sign);
-  const position = chart.positions.get(rulerKey);
-  if (!position) return null;
-  return {
-    id: `${house}.${rulerKey}.${position.house}`,
-    section: 'house_ruler',
-    title: `${house} дом в ${SIGNS_IN[sign]}, управитель ${position.body.name} в ${position.house} доме`,
-    where: `${house} дом`,
-    fallback: `Тема ${house} дома идёт через ${position.body.name} — он стоит `
-      + `в ${position.house} доме, в ${SIGNS_IN[position.sign.index]}.`,
-  };
-}
+  // Дом говорит о чём, управитель — через что. Это основной способ читать
+  // тему дома, и он работает даже когда в самом доме пусто.
+  house_ruler(chart, exactTime, spec) {
+    if (!exactTime) return null;
+    const cusps = chart.houses.get(chart.houseSystem).cusps;
+    const sign = signIndex(cusps[spec.house - 1]);
+    const ruler = rulerOf(sign);
+    const position = chart.positions.get(ruler);
+    if (!position) return null;
+    return {
+      id: `${spec.house}.${ruler}.${position.house}`,
+      section: 'house_ruler',
+      title: `${spec.house} дом в ${SIGNS_IN[sign]}, управитель ${position.body.name} в ${position.house} доме`,
+      where: `${spec.house} дом`,
+      fallback: `Тема ${spec.house} дома идёт через ${position.body.name} — он стоит `
+        + `в ${position.house} доме, в ${SIGNS_IN[position.sign.index]}.`,
+    };
+  },
 
-function rulerOfSign(chart, sign) {
-  // Управитель берётся из уже посчитанных диспозиторов карты.
-  for (const [key, position] of chart.positions) {
-    if (chart.dispositors.dispositor.has(key) && position.sign.index === sign) break;
-  }
-  const table = ['mars', 'venus', 'mercury', 'moon', 'sun', 'mercury',
-    'venus', 'mars', 'jupiter', 'saturn', 'saturn', 'jupiter'];
-  return table[sign % 12];
-}
+  planets_in_house(chart, exactTime, spec) {
+    if (!exactTime) return null;
+    const inside = [...chart.positions.entries()]
+      .filter(([, position]) => position.house === spec.house)
+      .map(([key]) => key);
+    if (!inside.length) return null;
+    return {
+      id: `${spec.house}.${inside.join('-')}`,
+      section: 'planets_in_house',
+      title: `В ${spec.house} доме: ${inside.map((key) => bodyName(chart, key)).join(', ')}`,
+      where: `${spec.house} дом`,
+      fallback: `В ${spec.house} доме стоят: ${inside.map((key) => bodyName(chart, key)).join(', ')}.`,
+    };
+  },
 
-function aspectBetween(chart, a, b) {
-  const hit = chart.aspects.find(
-    (h) => (h.bodyA === a && h.bodyB === b) || (h.bodyA === b && h.bodyB === a),
-  );
-  if (!hit) return null;
-  return {
-    id: `${[a, b].sort().join('.')}.${hit.aspect.key}`,
-    section: 'aspect',
-    title: `${bodyName(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${bodyName(chart, hit.bodyB)}`,
-    where: `орб ${hit.orb.toFixed(1)}°`,
-  };
-}
+  aspect(chart, exactTime, spec) {
+    const hit = chart.aspects.find(
+      (h) => (h.bodyA === spec.a && h.bodyB === spec.b)
+        || (h.bodyA === spec.b && h.bodyB === spec.a),
+    );
+    if (!hit) return null;
+    return {
+      id: `${[spec.a, spec.b].sort().join('.')}.${hit.aspect.key}`,
+      section: 'aspect',
+      title: `${shortName(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${shortName(chart, hit.bodyB)}`,
+      where: `орб ${hit.orb.toFixed(1)}°`,
+    };
+  },
 
-function dignityNote(chart, key) {
-  const item = chart.dignities.get(key);
-  if (!item || item.peregrine) return null;
-  const strong = item.own.filter((code) => code === 'domicile' || code === 'exaltation');
-  if (!strong.length) return null;
-  return {
-    id: `${key}.${strong[0]}`,
-    section: 'dignity',
-    title: `${bodyName(chart, key)}: ${DIGNITY_NAMES[strong[0]]}`,
-    where: 'достоинство',
-    fallback: `${bodyName(chart, key)} стоит сильно — это ${DIGNITY_NAMES[strong[0]]}.`,
-  };
-}
+  dignity(chart, exactTime, spec) {
+    const item = chart.dignities.get(spec.body);
+    if (!item) return null;
+    const strong = item.own.filter((code) => code === 'domicile' || code === 'exaltation');
+    if (!strong.length) return null;
+    return {
+      id: `${spec.body}.${strong[0]}`,
+      section: 'dignity',
+      title: `${bodyName(chart, spec.body)}: ${DIGNITY_NAMES[strong[0]]}`,
+      where: 'достоинство',
+      fallback: `${bodyName(chart, spec.body)} стоит сильно — это ${DIGNITY_NAMES[strong[0]]}.`,
+    };
+  },
 
-// Что показывать под каждой темой.
-const TOPIC_FACTORS = {
-  money: (chart, exactTime) => [
-    houseRuler(chart, 2, exactTime),
-    houseRuler(chart, 10, exactTime),
-    houseRuler(chart, 6, exactTime),
-    planetInSign(chart, 'venus'),
-    planetInHouse(chart, 'venus', exactTime),
-    planetInSign(chart, 'jupiter'),
-    planetInHouse(chart, 'jupiter', exactTime),
-    planetInSign(chart, 'saturn'),
-    planetInHouse(chart, 'saturn', exactTime),
-    dignityNote(chart, 'venus'),
-    dignityNote(chart, 'jupiter'),
-  ],
-  relations: (chart, exactTime) => [
-    houseRuler(chart, 7, exactTime),
-    houseRuler(chart, 5, exactTime),
-    planetInSign(chart, 'venus'),
-    planetInHouse(chart, 'venus', exactTime),
-    planetInSign(chart, 'mars'),
-    planetInHouse(chart, 'mars', exactTime),
-    planetInSign(chart, 'moon'),
-    planetInHouse(chart, 'moon', exactTime),
-    aspectBetween(chart, 'venus', 'mars'),
-    aspectBetween(chart, 'moon', 'venus'),
-    aspectBetween(chart, 'venus', 'saturn'),
-  ],
-  character: (chart, exactTime) => [
-    planetInSign(chart, 'sun'),
-    planetInHouse(chart, 'sun', exactTime),
-    planetInSign(chart, 'moon'),
-    planetInHouse(chart, 'moon', exactTime),
-    planetInSign(chart, 'mercury'),
-    aspectBetween(chart, 'sun', 'moon'),
-    dignityNote(chart, 'sun'),
-    dignityNote(chart, 'moon'),
-  ],
-  purpose: (chart, exactTime) => [
-    planetInSign(chart, 'true_node'),
-    planetInHouse(chart, 'true_node', exactTime),
-    planetInSign(chart, 'south_node'),
-    planetInHouse(chart, 'south_node', exactTime),
-    houseRuler(chart, 10, exactTime),
-    houseRuler(chart, 9, exactTime),
-  ],
+  ascendant(chart, exactTime) {
+    if (!exactTime) return null;
+    const sign = toSign(chart.angles.asc);
+    return {
+      id: `asc.${sign.index}`,
+      section: 'ascendant',
+      title: `Асцендент в ${SIGNS_IN[sign.index]}`,
+      where: 'угол карты',
+    };
+  },
+
+  midheaven(chart, exactTime) {
+    if (!exactTime) return null;
+    const sign = toSign(chart.angles.mc);
+    return {
+      id: `mc.${sign.index}`,
+      section: 'midheaven',
+      title: `МС в ${SIGNS_IN[sign.index]}`,
+      where: 'угол карты',
+    };
+  },
+
+  // Финальный диспозитор — планета, к которой сходятся все цепочки
+  // управления. Если он есть, им обычно и объясняется склад карты.
+  final_dispositor(chart) {
+    const finals = chart.dispositors.finalDispositors;
+    if (!finals.length) return null;
+    return {
+      id: finals.join('-'),
+      section: 'final_dispositor',
+      title: finals.length === 1
+        ? `Финальный диспозитор: ${bodyName(chart, finals[0])}`
+        : `Финальные диспозиторы: ${finals.map((key) => bodyName(chart, key)).join(', ')}`,
+      where: 'цепочки управления',
+      fallback: `Все цепочки управления в карте сходятся к ${finals.map((key) => bodyName(chart, key)).join(' и ')}.`,
+    };
+  },
+
+  elements(chart) {
+    const counts = { Огонь: 0, Земля: 0, Воздух: 0, Вода: 0 };
+    for (const [key, position] of chart.positions) {
+      if (!['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn'].includes(key)) continue;
+      counts[position.sign.element] += 1;
+    }
+    const order = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const missing = order.filter(([, count]) => count === 0).map(([name]) => name);
+    return {
+      id: order.map(([name, count]) => `${name}${count}`).join('-'),
+      section: 'elements',
+      title: `Стихии: ${order.map(([name, count]) => `${name} ${count}`).join(', ')}`,
+      where: 'по семи планетам',
+      fallback: missing.length
+        ? `Больше всего ${order[0][0].toLowerCase()}а. Не набрано ни одной планеты в стихии: ${missing.join(', ').toLowerCase()}.`
+        : `Больше всего ${order[0][0].toLowerCase()}а, меньше всего ${order[order.length - 1][0].toLowerCase()}ы.`,
+    };
+  },
 };
 
-function ascendantFactor(chart, exactTime) {
-  if (!exactTime) return null;
-  const sign = toSign(chart.angles.asc);
-  return {
-    id: `asc.${sign.index}`,
-    section: 'ascendant',
-    title: `Асцендент в ${SIGNS_IN[sign.index]}`,
-    where: 'угол карты',
-  };
-}
-
 export function collectFactors(chart, topicKey, exactTime) {
-  const build = TOPIC_FACTORS[topicKey];
-  if (!build) return [];
-  const factors = build(chart, exactTime).filter(Boolean);
-  if (topicKey === 'character') {
-    const ascendant = ascendantFactor(chart, exactTime);
-    if (ascendant) factors.unshift(ascendant);
+  const topic = (content.topics || []).find((item) => item.key === topicKey);
+  if (!topic) return [];
+  const factors = [];
+  for (const spec of topic.factors || []) {
+    const build = FACTOR_KINDS[spec.type];
+    if (!build) continue;
+    const factor = build(chart, exactTime, spec);
+    if (factor) factors.push(factor);
   }
   return factors;
+}
+
+export function availableFactorKinds() {
+  return Object.keys(FACTOR_KINDS);
 }
 
 // --- вывод -----------------------------------------------------------------
