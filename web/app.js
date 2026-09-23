@@ -8,6 +8,8 @@ import { formatLongitude, SIGN_GLYPHS } from './astro/zodiac.js';
 import { formatOffset } from './astro/timezone.js';
 import { label, loadCities, search } from './places.js';
 import { renderReadings, loadInterpretations } from './readings.js';
+import { renderTransits, loadTransitTexts } from './transit-view.js';
+import { loadEvents } from './astro/transits.js';
 
 const form = document.getElementById('form');
 const dateInput = document.getElementById('date');
@@ -33,6 +35,8 @@ async function boot() {
       Ephemeris.load('data/ephemeris.bin'),
       loadCities(),
       loadInterpretations(),
+      loadEvents(),
+      loadTransitTexts(),
     ]);
     ephemeris = loaded;
     submit.disabled = false;
@@ -167,6 +171,9 @@ function render(chart, exactTime) {
   result.append(renderAspects(chart));
   if (chart.dignities.size) result.append(renderDignities(chart));
   if (chart.patterns.length || chart.stelliums.length) result.append(renderPatterns(chart));
+
+  const transits = renderTransits(chart, { exactTime });
+  if (transits) result.append(transits);
 
   const readings = renderReadings(chart, { exactTime });
   if (readings) result.append(readings);

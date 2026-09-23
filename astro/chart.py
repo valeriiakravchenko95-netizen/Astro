@@ -105,6 +105,10 @@ class Chart:
     ephemeris: str
     diurnal: Optional[bool] = None
     lilith_model: str = nodes_mod.LILITH_SWISS
+    #: Известно ли точное время рождения. Когда нет, карта считается на
+    #: полдень, и всё, что зависит от минут — дома, углы, положение Луны
+    #: с точностью до градусов — достоверным не является.
+    exact_time: bool = True
 
     @property
     def primary_houses(self) -> houses_mod.Houses:
@@ -244,6 +248,7 @@ class Chart:
             "chart_ruler": self.chart_ruler,
             "diurnal": self.diurnal,
             "lilith_model": self.lilith_model,
+            "exact_time": self.exact_time,
         }
         if include_birth_data:
             data["birth"] = {
@@ -273,6 +278,7 @@ def compute(
     ruler_scheme: str = rulers_mod.TRADITIONAL,
     lilith_model: str = nodes_mod.LILITH_SWISS,
     antiscia_orb: float = 1.0,
+    exact_time: bool = True,
     ephemeris: Optional[Ephemeris] = None,
 ) -> Chart:
     """Считает натальную карту на местное гражданское время."""
@@ -296,6 +302,7 @@ def compute(
         ruler_scheme=ruler_scheme,
         lilith_model=lilith_model,
         antiscia_orb=antiscia_orb,
+        exact_time=exact_time,
         ephemeris=ephemeris,
     )
 
@@ -312,6 +319,7 @@ def compute_at(
     ruler_scheme: str = rulers_mod.TRADITIONAL,
     lilith_model: str = nodes_mod.LILITH_SWISS,
     antiscia_orb: float = 1.0,
+    exact_time: bool = True,
     ephemeris: Optional[Ephemeris] = None,
 ) -> Chart:
     """Считает карту на уже разрешённый момент времени."""
@@ -447,4 +455,5 @@ def compute_at(
         ephemeris=eph.name,
         diurnal=diurnal,
         lilith_model=lilith_model,
+        exact_time=exact_time,
     )

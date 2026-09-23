@@ -14,6 +14,8 @@
 | `data/ephemeris.bin` | таблицы положений, 1920–2035 |
 | `data/cities.json` | города для поиска места |
 | `content/interpretations.json` | тексты трактовок — правятся вручную |
+| `content/transits.json` | тексты про события неба |
+| `data/events.json` | календарь событий: станции, аспекты, ингрессии, лунации |
 | `places.js`, `readings.js` | поиск места и подбор трактовок |
 
 ## Как это собрано
@@ -24,6 +26,7 @@
 python3 scripts/build_web_ephemeris.py   # таблицы положений
 python3 scripts/build_web_constants.py   # нутация, шкалы времени
 python3 scripts/build_web_cities.py      # города
+python3 scripts/build_web_events.py      # календарь событий неба
 ```
 
 Пересобирать нужно, только если поменялось ядро или захотелось другой
