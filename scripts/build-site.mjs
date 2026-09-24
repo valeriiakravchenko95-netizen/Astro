@@ -38,6 +38,9 @@ fs.writeFileSync(path.join(dist, 'content', 'public.json'), JSON.stringify({
   topics: read('interpretations.json').topics,
   child_topics: read('interpretations.json').child_topics || [],
   featured: read('transits.json').featured || null,
+  // короткие ссылки на события: только ключ события, без текстов
+  event_links: Object.fromEntries(Object.entries(read('transits.json').links || {})
+    .map(([slug, link]) => [slug, { event: link.event }])),
   checks: stripCheckTexts(read('checks.json')),
 }));
 

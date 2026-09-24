@@ -6,6 +6,7 @@ import { textNodes } from './text.js';
 
 let content = {
   events: {}, contacts: {}, points: {}, forms: {}, houses: {}, house_details: {}, featured: null,
+  links: {},
 };
 
 export async function loadTransitTexts() {
@@ -14,7 +15,9 @@ export async function loadTransitTexts() {
   try {
     const response = await fetch('content/public.json');
     if (response.ok) {
-      content.featured = (await response.json()).featured || null;
+      const data = await response.json();
+      content.featured = data.featured || null;
+      content.links = data.event_links || {};
       return content;
     }
   } catch (error) {
@@ -35,17 +38,36 @@ export function addSkyTexts(texts) {
   }
 }
 
+// Событие, о котором пришли спросить: ?event=ключ@дата или короткая ссылка
+// под рилс вроде /polnolunie (раздел links в transits.json).
+export function askedEvent() {
+  const byQuery = findEvent(new URLSearchParams(location.search).get('event'));
+  if (byQuery) return byQuery;
+  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, '').toLowerCase();
+  const link = path ? content.links?.[path] : null;
+  return link ? findEvent(link.event) : null;
+}
+
+// Текст события. Для конкретного дня может быть свой, под ключом с датой
+// («lunation.full@2026-09-26»): так пишется разбор под рилс, а общий текст
+// остается для остальных полнолуний.
+function eventText(event) {
+  return content.events?.[`${event.key}@${event.date}`] || content.events?.[event.key] || '';
+}
+
 // Какие тексты раздела неба понадобятся этой карте: события рядом с
 // сегодняшним днем, личный список, событие из ссылки и все касания в них.
 export function neededSkyTexts(chart, exactTime) {
   const events = new Map();
   for (const event of eventsAround()) events.set(event.key + event.date, event);
   for (const { event } of strongestEvents(chart, { exactTime })) events.set(event.key + event.date, event);
-  for (const asked of [new URLSearchParams(location.search).get('event'), content.featured]) {
-    const event = findEvent(asked);
-    if (event) events.set(event.key + event.date, event);
-  }
   const wanted = [];
+  for (const event of [askedEvent(), findEvent(content.featured)]) {
+    if (!event) continue;
+    events.set(event.key + event.date, event);
+    // свой текст на конкретный день бывает только у событий из ссылок
+    wanted.push(['events', `${event.key}@${event.date}`]);
+  }
   for (const event of events.values()) {
     wanted.push(['events', event.key]);
     for (const hit of examine(chart, event.longitude, event.title).hits) {
@@ -87,8 +109,7 @@ function element(tag, className, text) {
 // или с датой через собаку - так пост в ленте ведет ровно на то событие,
 // о котором рассказывали.
 function chooseEvent(events) {
-  const asked = new URLSearchParams(location.search).get('event');
-  const byLink = findEvent(asked);
+  const byLink = askedEvent();
   if (byLink) return byLink;
   const featured = findEvent(content.featured);
   if (featured) return featured;
@@ -146,7 +167,7 @@ export function renderTransits(chart, { exactTime }) {
       + (event.past ? ' · уже прошло' : ''));
     body.append(heading, when);
 
-    const about = content.events?.[event.key];
+    const about = eventText(event);
     if (about) body.append(...textNodes(about));
 
     const report = examine(chart, event.longitude, event.title);
@@ -159,12 +180,14 @@ export function renderTransits(chart, { exactTime }) {
     }
 
     const verdict = element('div', 'warn');
-    const parts = [];
     if (report.hits.length) {
-      parts.push(`Задевает ${plural(report.hits.length, 'точку', 'точки', 'точек')} карты`);
+      const parts = [`Задевает ${plural(report.hits.length, 'точку', 'точки', 'точек')} карты`];
+      if (report.house) parts.push(`градус приходится на ${report.house} дом`);
+      verdict.textContent = parts.join(', ') + '.';
+    } else {
+      verdict.textContent = `Лично тебя не задевает: ни одна точка карты не попадает в орбис. `
+        + `Градус приходится на ${report.house} дом - в этой сфере событие пройдет фоном.`;
     }
-    if (report.house) parts.push(`градус приходится на ${report.house} дом`);
-    verdict.textContent = parts.join(', ') + '.';
     body.append(verdict);
 
     const table = element('table');

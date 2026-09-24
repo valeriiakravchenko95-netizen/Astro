@@ -12,6 +12,7 @@ import {
 } from './readings.js';
 import {
   renderTransits, renderUpcoming, loadTransitTexts, neededSkyTexts, addSkyTexts,
+  askedEvent,
 } from './transit-view.js';
 import { renderWheel } from './wheel.js';
 import {
@@ -260,12 +261,17 @@ function render(chart, exactTime) {
   target.append(head);
 
   // Сначала то, ради чего человек пришел: разбор по теме. Небо и цифры ниже.
+  // Если пришли по ссылке на событие неба (рилс про полнолуние), первым идет
+  // оно.
+  const transits = renderTransits(chart, { exactTime });
+  const eventFirst = Boolean(transits && !check && askedEvent());
+  if (eventFirst) target.append(transits);
+
   const readings = renderReadings(chart, { exactTime });
   if (readings) target.append(readings);
   const readingsOffer = check ? null : renderOffer('readings');
   if (readingsOffer) target.append(readingsOffer);
 
-  const transits = renderTransits(chart, { exactTime });
   if (transits) {
     target.append(renderUpcoming(chart, {
       exactTime,
@@ -274,7 +280,7 @@ function render(chart, exactTime) {
         transits.scrollIntoView({ behavior: 'smooth', block: 'start' });
       },
     }));
-    target.append(transits);
+    if (!eventFirst) target.append(transits);
   }
   const skyOffer = renderOffer('sky');
   if (skyOffer) target.append(skyOffer);
