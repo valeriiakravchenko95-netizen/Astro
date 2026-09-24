@@ -7,8 +7,10 @@ import { PLACIDUS, WHOLE_SIGN } from './astro/houses.js';
 import { formatLongitude, SIGN_GLYPHS } from './astro/zodiac.js';
 import { formatOffset } from './astro/timezone.js';
 import { label, loadCities, search } from './places.js';
-import { renderReadings, loadInterpretations } from './readings.js';
-import { renderTransits, renderUpcoming, loadTransitTexts } from './transit-view.js';
+import { renderReadings, loadInterpretations, neededTexts, addTexts } from './readings.js';
+import {
+  renderTransits, renderUpcoming, loadTransitTexts, neededSkyTexts, addSkyTexts,
+} from './transit-view.js';
 import { renderWheel } from './wheel.js';
 import { loadSite, renderAuthor, renderOffer } from './site.js';
 import { loadEvents } from './astro/transits.js';
@@ -27,6 +29,9 @@ const genderInputs = document.querySelectorAll('input[name="gender"]');
 
 let ephemeris = null;
 let chosenPlace = null;
+// Опубликованная страница берет тексты у сервера по одному запросу на карту.
+// При работе с исходниками тексты уже загружены целиком из content/.
+let published = false;
 
 function setStatus(text, isError = false) {
   status.textContent = text;
@@ -42,6 +47,7 @@ async function boot() {
       loadEvents(),
       loadTransitTexts(),
       loadSite().then(() => renderAuthor(document.querySelector('header'))),
+      fetch('content/public.json').then((response) => { published = response.ok; }, () => {}),
     ]);
     ephemeris = loaded;
     submit.disabled = false;
@@ -94,7 +100,25 @@ unknownTime.addEventListener('change', () => {
 
 // --- расчёт ----------------------------------------------------------------
 
-form.addEventListener('submit', (event) => {
+// Тексты для этой карты: только те, что она покажет. Весь набор целиком
+// на страницу не попадает.
+async function fetchTexts(chart, exactTime) {
+  if (!published) return;
+  const response = await fetch('api/texts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      natal: neededTexts(chart, exactTime),
+      sky: neededSkyTexts(chart, exactTime),
+    }),
+  });
+  if (!response.ok) throw new Error('Не удалось загрузить тексты, попробуй еще раз');
+  const payload = await response.json();
+  addTexts(payload.natal);
+  addSkyTexts(payload.sky);
+}
+
+form.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!ephemeris) return;
 
@@ -124,11 +148,16 @@ form.addEventListener('submit', (event) => {
       // автора трактовок: Скорпион - Плутон, Водолей - Уран, Рыбы - Нептун.
       rulerScheme: MODERN,
     });
+    submit.disabled = true;
+    setStatus('Считаю...');
+    await fetchTexts(chart, exactTime);
     setStatus('');
     render(chart, exactTime);
     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (error) {
     setStatus(error.message, true);
+  } finally {
+    submit.disabled = false;
   }
 });
 

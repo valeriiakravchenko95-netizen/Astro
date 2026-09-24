@@ -8,14 +8,60 @@ let content = {
   events: {}, contacts: {}, points: {}, forms: {}, houses: {}, house_details: {}, featured: null,
 };
 
-export async function loadTransitTexts(url = 'content/transits.json') {
+export async function loadTransitTexts() {
+  // Опубликованная страница получает отсюда только закрепленное событие;
+  // тексты придут с сервера под конкретную карту (см. neededSkyTexts).
   try {
-    const response = await fetch(url);
+    const response = await fetch('content/public.json');
+    if (response.ok) {
+      content.featured = (await response.json()).featured || null;
+      return content;
+    }
+  } catch (error) {
+    // работаем с исходниками
+  }
+  try {
+    const response = await fetch('content/transits.json');
     if (response.ok) content = { ...content, ...(await response.json()) };
   } catch (error) {
     // Без текстов раздел все равно полезен: видно, задевает или нет.
   }
   return content;
+}
+
+export function addSkyTexts(texts) {
+  for (const [section, items] of Object.entries(texts || {})) {
+    if (items && typeof items === 'object') content[section] = { ...(content[section] || {}), ...items };
+  }
+}
+
+// Какие тексты раздела неба понадобятся этой карте: события рядом с
+// сегодняшним днем, личный список, событие из ссылки и все касания в них.
+export function neededSkyTexts(chart, exactTime) {
+  const events = new Map();
+  for (const event of eventsAround()) events.set(event.key + event.date, event);
+  for (const { event } of strongestEvents(chart, { exactTime })) events.set(event.key + event.date, event);
+  for (const asked of [new URLSearchParams(location.search).get('event'), content.featured]) {
+    const event = findEvent(asked);
+    if (event) events.set(event.key + event.date, event);
+  }
+  const wanted = [];
+  for (const event of events.values()) {
+    wanted.push(['events', event.key]);
+    for (const hit of examine(chart, event.longitude, event.title).hits) {
+      if (hit.natalKind === 'cusp') {
+        wanted.push(['contacts', `cusp.${hit.house}`]);
+      } else {
+        wanted.push(['contacts', `${hit.aspect.key}.${hit.natal}`], ['points', hit.natal]);
+      }
+    }
+  }
+  for (const form of ['conjunction', 'opposition', 'square', 'trine', 'sextile']) wanted.push(['forms', form]);
+  for (let house = 1; house <= 12; house += 1) {
+    wanted.push(['houses', String(house)], ['house_details', String(house)]);
+  }
+  const unique = new Map(wanted.map((pair) => [pair.join('\u0000'), pair]));
+  return [...unique.values()];
 }
 
 // Склонение существительного при числе: одна точка, две точки, пять точек.

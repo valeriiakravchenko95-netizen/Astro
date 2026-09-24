@@ -12,15 +12,47 @@ import { textNodes } from './text.js';
 
 let content = { topics: [], texts: {} };
 
-export async function loadInterpretations(url = 'content/interpretations.json') {
+// На опубликованной странице тексты не лежат одним файлом: страница знает
+// только список тем (content/public.json), а сами тексты спрашивает у
+// сервера - ровно те, что нужны для этой карты. При работе с исходниками
+// (локально, в тестах) public.json нет, и читается полный файл.
+export async function loadInterpretations() {
   try {
-    const response = await fetch(url);
+    const response = await fetch('content/public.json');
+    if (response.ok) {
+      const published = await response.json();
+      content = { topics: published.topics || [], texts: {} };
+      return content;
+    }
+  } catch (error) {
+    // нет - значит, работаем с исходниками
+  }
+  try {
+    const response = await fetch('content/interpretations.json');
     if (response.ok) content = await response.json();
   } catch (error) {
     // Без трактовок страница остается полезной: цифры никуда не делись.
     content = { topics: [], texts: {} };
   }
   return content;
+}
+
+// Какие тексты понадобятся этой карте во всех темах: точные ключи и куски.
+export function neededTexts(chart, exactTime) {
+  const wanted = [];
+  for (const topic of content.topics || []) {
+    for (const factor of collectFactors(chart, topic.key, exactTime)) {
+      wanted.push([factor.section, factor.id]);
+      for (const piece of factor.parts || []) wanted.push([piece.section, piece.key]);
+    }
+  }
+  return wanted;
+}
+
+export function addTexts(texts) {
+  for (const [section, items] of Object.entries(texts || {})) {
+    content.texts[section] = { ...(content.texts[section] || {}), ...items };
+  }
 }
 
 function text(section, key) {

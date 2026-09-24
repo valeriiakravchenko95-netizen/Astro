@@ -1,0 +1,13 @@
+{
+  "name": "astro-page",
+  "private": true,
+  "description": "Сборка страницы для публикации на Cloudflare Pages",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-site.mjs",
+    "preview": "node scripts/serve-local.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}
