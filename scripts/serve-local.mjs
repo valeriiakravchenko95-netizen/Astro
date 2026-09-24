@@ -12,16 +12,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const PORT = Number(process.env.PORT) || 8788;
 
-// Функция импортирует JSON как модуль; node это умеет с атрибутом type,
-// поэтому для проверки подменяем импорт готовыми объектами.
-const natal = JSON.parse(fs.readFileSync(path.join(root, 'web/content/interpretations.json'), 'utf8'));
-const sky = JSON.parse(fs.readFileSync(path.join(root, 'web/content/transits.json'), 'utf8'));
-const source = fs.readFileSync(path.join(root, 'functions/api/texts.js'), 'utf8')
-  .replace(/^import natal .*$/m, 'const natal = globalThis.__natal;')
-  .replace(/^import sky .*$/m, 'const sky = globalThis.__sky;');
-globalThis.__natal = natal;
-globalThis.__sky = sky;
-const handler = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+// Та же точка входа, что на Cloudflare Workers; файлы страницы отдаются
+// отсюда вместо Cloudflare.
+const worker = (await import('../worker/index.js')).default;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -32,11 +25,13 @@ const TYPES = {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   if (url.pathname === '/api/texts') {
-    if (req.method !== 'POST') { res.writeHead(405); res.end(); return; }
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    const request = new Request(url, { method: 'POST', headers: req.headers, body: Buffer.concat(chunks) });
-    const response = await handler.onRequestPost({ request });
+    const request = new Request(url, {
+      method: req.method, headers: req.headers,
+      body: req.method === 'POST' ? Buffer.concat(chunks) : undefined,
+    });
+    const response = await worker.fetch(request, {});
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(await response.text());
     return;

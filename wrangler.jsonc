@@ -1,0 +1,12 @@
+// Настройки публикации на Cloudflare Workers. Имя должно совпадать с
+// названием проекта в Cloudflare.
+{
+  "name": "valeri-lume",
+  "main": "worker/index.js",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": false }
+}

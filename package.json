@@ -8,6 +8,7 @@
     "preview": "node scripts/serve-local.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.24.2"
+    "esbuild": "0.24.2",
+    "wrangler": "^4.137.0"
   }
 }
