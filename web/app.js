@@ -8,7 +8,7 @@ import { formatLongitude, SIGN_GLYPHS } from './astro/zodiac.js';
 import { formatOffset } from './astro/timezone.js';
 import { label, loadCities, search } from './places.js';
 import {
-  renderReadings, loadInterpretations, neededTexts, addTexts, setOpenCards,
+  renderReadings, loadInterpretations, neededTexts, addTexts, setOpenCards, childTopics,
 } from './readings.js';
 import {
   renderTransits, renderUpcoming, loadTransitTexts, neededSkyTexts, addSkyTexts,
@@ -125,15 +125,19 @@ function isChild(year, month, day) {
 }
 
 async function fetchTexts(chart, exactTime) {
-  if (!published || chart.child) return;
-  const response = await fetch('api/texts', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
+  if (!published) return;
+  // Для детской карты - только тексты детской витрины.
+  const request = chart.child
+    ? { natal: neededTexts(chart, exactTime, childTopics()) }
+    : {
       natal: neededTexts(chart, exactTime),
       sky: neededSkyTexts(chart, exactTime),
       checks: neededCheckTexts(askedCheck()),
-    }),
+    };
+  const response = await fetch('api/texts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
   });
   if (!response.ok) throw new Error('Не удалось загрузить тексты, попробуй еще раз');
   const payload = await response.json();
@@ -297,6 +301,11 @@ function renderChild(chart, exactTime) {
     + (exactTime ? ` ${timeInput.value}` : '')));
   head.append(renderWheel(chart, { exactTime }));
   result.append(head);
+
+  const readings = renderReadings(chart, {
+    exactTime, topics: childTopics(), title: 'Для родителей', note: '', limit: 0,
+  });
+  if (readings) result.append(readings);
 
   const note = card();
   note.classList.add('child');

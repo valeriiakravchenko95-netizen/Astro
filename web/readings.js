@@ -21,7 +21,7 @@ export async function loadInterpretations() {
     const response = await fetch('content/public.json');
     if (response.ok) {
       const published = await response.json();
-      content = { topics: published.topics || [], texts: {} };
+      content = { topics: published.topics || [], child_topics: published.child_topics || [], texts: {} };
       return content;
     }
   } catch (error) {
@@ -48,9 +48,13 @@ export function setOpenCards(count, note = '') {
   closingNote = note || '';
 }
 
-export function neededTexts(chart, exactTime) {
+export function childTopics() {
+  return content.child_topics || [];
+}
+
+export function neededTexts(chart, exactTime, topics = content.topics || []) {
   const wanted = [];
-  for (const topic of content.topics || []) {
+  for (const topic of topics) {
     // Тексты закрытых карточек не запрашиваются вовсе: их нет на странице.
     // Запас в две карточки - на случай, если у первых текста не окажется.
     const factors = collectFactors(chart, topic.key, exactTime);
@@ -103,14 +107,16 @@ const part = (section, key, label = null) => ({ section, key, label });
 // (parts) - так не нужно писать отдельный текст на каждое сочетание.
 
 const FACTOR_KINDS = {
+  // section и where можно задать в описании фактора: так детская витрина
+  // берет свои тексты («child_planet_in_sign») и свои подписи.
   planet_sign(chart, exactTime, spec) {
     const position = chart.positions.get(spec.body);
     if (!position) return null;
     return {
       id: `${spec.body}.${position.sign.index}`,
-      section: 'planet_in_sign',
+      section: spec.section || 'planet_in_sign',
       title: `${position.body.name} в ${SIGNS_IN[position.sign.index]}`,
-      where: 'знак',
+      where: spec.where || 'знак',
     };
   },
 
@@ -270,7 +276,8 @@ const FACTOR_KINDS = {
 };
 
 export function collectFactors(chart, topicKey, exactTime) {
-  const topic = (content.topics || []).find((item) => item.key === topicKey);
+  const topic = [...(content.topics || []), ...(content.child_topics || [])]
+    .find((item) => item.key === topicKey);
   if (!topic) return [];
   const factors = [];
   for (const spec of topic.factors || []) {
@@ -288,14 +295,15 @@ export function availableFactorKinds() {
 
 // --- вывод -----------------------------------------------------------------
 
-export function renderReadings(chart, { exactTime }) {
-  const topics = content.topics || [];
+export function renderReadings(chart, {
+  exactTime, topics = content.topics || [], title = 'Разбор по теме', note = closingNote, limit = openCards,
+}) {
   if (!topics.length) return null;
 
   const node = document.createElement('section');
   node.className = 'card';
   const heading = document.createElement('h2');
-  heading.textContent = 'Разбор по теме';
+  heading.textContent = title;
   node.append(heading);
 
   const buttons = document.createElement('div');
@@ -325,7 +333,7 @@ export function renderReadings(chart, { exactTime }) {
     for (const factor of factors) {
       // Сверх открытых карточек ничего не показываем: отдельные положения
       // и так есть в открытом доступе, ценность консультации - в их связке.
-      if (openCards && opened >= openCards) break;
+      if (limit && opened >= limit) break;
       const own = text(factor.section, factor.id);
       const candidates = own
         ? [{ section: factor.section, key: factor.id, raw: own }]
@@ -369,11 +377,11 @@ export function renderReadings(chart, { exactTime }) {
   const showWithNote = show;
   const withNote = (topic) => {
     showWithNote(topic);
-    if (openCards && closingNote) {
-      const note = document.createElement('p');
-      note.className = 'closing';
-      note.textContent = closingNote;
-      body.append(note);
+    if (limit && note) {
+      const ending = document.createElement('p');
+      ending.className = 'closing';
+      ending.textContent = note;
+      body.append(ending);
     }
   };
 
@@ -387,6 +395,8 @@ export function renderReadings(chart, { exactTime }) {
     buttons.append(button);
   }
 
+  // Одна тема - кнопки выбора не нужны.
+  if (topics.length === 1) buttons.hidden = true;
   node.append(buttons, body);
   // Ссылка вида ?topic=money открывает сразу нужную тему: так пост про
   // деньги ведет прямо в «Деньги и работа».

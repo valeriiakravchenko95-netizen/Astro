@@ -36,6 +36,7 @@ fs.copyFileSync(path.join(web, 'content', 'site.json'), path.join(dist, 'content
 const read = (name) => JSON.parse(fs.readFileSync(path.join(web, 'content', name), 'utf8'));
 fs.writeFileSync(path.join(dist, 'content', 'public.json'), JSON.stringify({
   topics: read('interpretations.json').topics,
+  child_topics: read('interpretations.json').child_topics || [],
   featured: read('transits.json').featured || null,
   checks: stripCheckTexts(read('checks.json')),
 }));
