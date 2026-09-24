@@ -255,7 +255,7 @@ function plural(count, one, few, many) {
 
 export function renderCheck(chart, check) {
   const { results, yes, no, unknown } = runCheck(chart, check);
-  const node = element('section', 'card check');
+  const node = element('section', 'card check-card');
   node.append(element('h2', null, check.title));
 
   const total = results.length - unknown.length;
