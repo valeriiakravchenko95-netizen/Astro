@@ -341,7 +341,7 @@ function renderPositions(chart, exactTime) {
     table.append(row);
   }
   node.append(table);
-  if (exactTime) node.append(element('p', 'note', 'Последний столбец - дом. R - попятное движение, S - стоянка.'));
+  if (exactTime) node.append(element('p', 'note', 'Последний столбец - дом. R - ретроградное движение, S - стоянка.'));
   return node;
 }
 
@@ -406,7 +406,7 @@ function renderPatterns(chart) {
     const row = element('tr');
     row.append(element('td', 'name', stellium.byConjunction
       ? 'Стеллиум в соединении'
-      : `Стеллиум в знаке ${SIGN_GLYPHS[stellium.sign]}`));
+      : `Стеллиум в знаке ${SIGN_GLYPHS[stellium.sign]}\uFE0E`));
     row.append(element('td', 'deg', glyphs));
     list.append(row);
   }

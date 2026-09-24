@@ -3,6 +3,7 @@
    консультаций; текст - системным гротеском, чтобы легко читался с
    телефона. Тени и скругления почти убраны: вместо них тонкие линии. */
 
+@font-face { font-family: 'LumeAstro'; src: url('fonts/Astro.woff2') format('woff2'); font-display: block; unicode-range: U+2609,U+263D,U+263F,U+2640,U+2642,U+2643,U+2644,U+2645,U+2646,U+2647,U+260A,U+260B,U+26B8,U+2297,U+260C,U+260D,U+25B3,U+25A1,U+26B9,U+26BA,U+2220,U+26BC,U+26BB,U+2648,U+2649,U+264A,U+264B,U+264C,U+264D,U+264E,U+264F,U+2650,U+2651,U+2652,U+2653; }
 @font-face { font-family: 'Cormorant'; src: url('fonts/CG-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Cormorant'; src: url('fonts/CG-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
 @font-face { font-family: 'Cormorant'; src: url('fonts/CGi-400.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
@@ -20,8 +21,8 @@
   --accent-ink: #8a6c43;
   --accent-soft: #ece2d0;
   --danger: #8c3a2e;
-  --serif: 'Cormorant', 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
-  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --serif: 'LumeAstro', 'Cormorant', 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --sans: 'LumeAstro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 2px;
 }
 
@@ -164,7 +165,7 @@ button:disabled { opacity: .45; cursor: default; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
 td { padding: 8px 0; border-bottom: 1px solid var(--line); vertical-align: baseline; }
 tr:last-child td { border-bottom: 0; }
-.glyph { width: 26px; font-size: 16px; color: var(--accent); }
+.glyph { width: 26px; font-size: 18px; line-height: 1; color: var(--accent); }
 .name { white-space: nowrap; }
 .deg { text-align: right; white-space: nowrap; }
 .mark { width: 20px; text-align: center; color: var(--muted); font-size: 12px; }

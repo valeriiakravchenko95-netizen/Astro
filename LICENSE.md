@@ -22,3 +22,4 @@
 | tzdata | Python Software Foundation | Apache 2.0 |
 | aiogram (бот) | aiogram team | MIT |
 | Шрифт Cormorant Garamond | Christian Thalmann | SIL Open Font License 1.1 |
+| Астрологические символы из шрифта FreeSerif (GNU FreeFont), подмножество без изменений | GNU FreeFont contributors | GPL 3 с исключением для шрифтов (font exception) |

@@ -135,7 +135,7 @@ def find_stations(eph, jd_start: float, jd_end: float,
             longitude = _longitude(eph, key, jd)
             events.append(SkyEvent(
                 kind="station", jd=jd,
-                title=f"{body.name} {'разворачивается на попятное' if direction == 'retrograde' else 'возвращается к прямому ходу'}",
+                title=f"{body.name} {'уходит в ретроград' if direction == 'retrograde' else 'выходит из ретрограда'}",
                 bodies=(key,), longitude=longitude,
                 detail={"direction": direction},
             ))
