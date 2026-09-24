@@ -26,7 +26,7 @@ const SITE_URL = (process.env.SITE_URL || 'https://valeri-lume.lumeself.workers.
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, 'content'), { recursive: true });
 
-for (const file of ['favicon.svg', 'logo.svg', 'preview.png']) {
+for (const file of ['favicon.svg', 'apple-touch-icon.png', 'logo.svg', 'preview.png']) {
   fs.copyFileSync(path.join(web, file), path.join(dist, file));
 }
 fs.cpSync(path.join(web, 'fonts'), path.join(dist, 'fonts'), { recursive: true });

@@ -23,7 +23,9 @@ def page():
     site = json.loads((WEB / 'content' / 'site.json').read_text(encoding='utf-8'))
     author = site.get('author', {})
     nick = ('@' + author['instagram'].lstrip('@')) if author.get('instagram') else ''
-    logo = (WEB / 'logo.svg').read_text(encoding='utf-8').replace('currentColor', '#a8875a')
+    mark = (WEB / 'logo.svg').read_text(encoding='utf-8')
+    logo = mark.replace('currentColor', '#a8875a')
+    white = mark.replace('currentColor', '#fff').replace('stroke-width="12"', 'stroke-width="10"')
     fonts = WEB.as_uri() + '/fonts/'
     return f'''<!doctype html><html><head><meta charset="utf-8"><style>
     @font-face {{ font-family: C; src: url('{fonts}CG-400.woff2'); }}
@@ -31,22 +33,22 @@ def page():
     body {{ margin:0; width:1200px; height:630px; background:#f5f1e8; color:#1f1a15;
            font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; display:flex; align-items:center; }}
     .frame {{ position:absolute; inset:28px; border:1.5px solid #a8875a; }}
-    .text {{ padding-left:96px; width:640px; position:relative; }}
-    .brand {{ display:flex; align-items:center; gap:14px; font-weight:600; font-size:20px; letter-spacing:.42em; margin-bottom:44px; }}
-    .brand svg {{ width:44px; height:44px; }}
+    .text {{ padding-left:96px; width:600px; position:relative; }}
+    .brand {{ margin-bottom:44px; }}
+    .brand svg {{ display:block; width:132px; height:auto; }}
     h1 {{ font: 400 92px/1 C, serif; margin:0 0 26px; }}
     h1 em {{ color:#8a6c43; }}
     p {{ font: italic 400 34px/1.3 C, serif; margin:0; color:#7a6f63; }}
     .by {{ margin-top:34px; font-size:22px; letter-spacing:.12em; color:#8a6c43; }}
-    .wheel {{ position:relative; width:430px; height:430px; margin-left:10px; }}
-    .wheel svg {{ width:100%; height:100%; }}
-    .wheel svg g {{ stroke-width:1.1; }}
+    .mark {{ width:400px; height:400px; margin-left:24px; display:flex; align-items:center; justify-content:center;
+            background: radial-gradient(circle at 62% 55%, #fb7a75 0%, #f7968f 45%, #fcc8c1 85%, #fdd8d2 100%); }}
+    .mark svg {{ width:62%; height:auto; }}
     </style></head><body><div class="frame"></div>
-    <div class="text"><div class="brand">{logo}LUME</div>
+    <div class="text"><div class="brand">{logo}</div>
     <h1>Натальная <em>карта</em></h1>
-    <p>Характер, деньги, отношения, предназначение - и что из неба заденет именно тебя</p>
+    <p>Характер, деньги, отношения, предназначение&nbsp;- и что из неба заденет именно тебя</p>
     {f'<div class="by">{nick}</div>' if nick else ''}</div>
-    <div class="wheel">{logo}</div>
+    <div class="mark">{white}</div>
     </body></html>'''
 
 

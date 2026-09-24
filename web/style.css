@@ -56,13 +56,8 @@ body {
 /* --- шапка --- */
 
 header { padding: 44px 0 28px; text-align: center; }
-.brand {
-  display: inline-flex; align-items: center; gap: 10px;
-  color: var(--text); text-decoration: none;
-  font: 600 13px/1 var(--sans); letter-spacing: .42em; text-transform: uppercase;
-  margin-bottom: 26px;
-}
-.brand svg { width: 30px; height: 30px; color: var(--accent); }
+.brand { display: inline-block; color: var(--accent); margin-bottom: 26px; }
+.brand svg { display: block; width: 104px; height: auto; }
 h1 {
   font: 400 44px/1.05 var(--serif); letter-spacing: -.01em;
   margin: 0 0 12px;
@@ -301,7 +296,7 @@ button.more {
 footer { color: var(--muted); font-size: 12px; text-align: center; padding-top: 16px; line-height: 1.6; }
 footer a { color: var(--muted); }
 footer .sign { margin-top: 18px; }
-footer .sign svg { width: 22px; height: 22px; color: var(--accent); }
+footer .sign svg { width: 52px; height: auto; color: var(--accent); }
 
 [hidden] { display: none !important; }
 .story-holder img.story { display: block; width: 100%; max-width: 320px; margin: 12px auto 0; border: 1px solid var(--line); }

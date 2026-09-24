@@ -362,11 +362,9 @@ async function storyImage({ title, big, small, lines, link, nick }) {
   const svg = await (await fetch('logo.svg')).text();
   logo.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace('currentColor', '#a8875a'))}`;
   await logo.decode().catch(() => {});
-  ctx.drawImage(logo, width / 2 - 60, 170, 120, 120);
+  ctx.drawImage(logo, width / 2 - 125, 220, 250, 70);
   ctx.fillStyle = '#1f1a15';
   ctx.textAlign = 'center';
-  ctx.font = '600 30px -apple-system, Helvetica, sans-serif';
-  ctx.fillText('L U M E', width / 2, 350);
 
   const wrap = (text, font, maxWidth) => {
     ctx.font = font;
