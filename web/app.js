@@ -8,7 +8,9 @@ import { formatLongitude, SIGN_GLYPHS } from './astro/zodiac.js';
 import { formatOffset } from './astro/timezone.js';
 import { label, loadCities, search } from './places.js';
 import { renderReadings, loadInterpretations } from './readings.js';
-import { renderTransits, loadTransitTexts } from './transit-view.js';
+import { renderTransits, renderUpcoming, loadTransitTexts } from './transit-view.js';
+import { renderWheel } from './wheel.js';
+import { loadSite, renderAuthor, renderOffer } from './site.js';
 import { loadEvents } from './astro/transits.js';
 import { setGender } from './text.js';
 
@@ -39,6 +41,7 @@ async function boot() {
       loadInterpretations(),
       loadEvents(),
       loadTransitTexts(),
+      loadSite().then(() => renderAuthor(document.querySelector('header'))),
     ]);
     ephemeris = loaded;
     submit.disabled = false;
@@ -150,7 +153,7 @@ function render(chart, exactTime) {
   const { name, where } = label(chosenPlace);
   const local = chart.moment;
   const head = card();
-  head.append(element('h2', null, 'Карта'));
+  head.append(element('h2', null, 'Твоя карта'));
   head.append(element('p', 'note',
     `${name}, ${where.split(',')[0]} · ${dateInput.value.split('-').reverse().join('.')}`
     + (exactTime ? ` ${timeInput.value}` : '')
@@ -170,18 +173,38 @@ function render(chart, exactTime) {
       'В этот день стрелки переводили назад, и такой час прошел дважды. '
       + 'Взят первый.'));
   }
+  head.append(renderWheel(chart, { exactTime }));
   result.append(head);
 
-  result.append(renderPositions(chart, exactTime));
-  if (exactTime) result.append(renderAngles(chart));
-  result.append(renderAspects(chart));
-  if (chart.patterns.length || chart.stelliums.length) result.append(renderPatterns(chart));
-
-  const transits = renderTransits(chart, { exactTime });
-  if (transits) result.append(transits);
-
+  // Сначала то, ради чего человек пришел: разбор по теме. Небо и цифры ниже.
   const readings = renderReadings(chart, { exactTime });
   if (readings) result.append(readings);
+  const readingsOffer = renderOffer('readings');
+  if (readingsOffer) result.append(readingsOffer);
+
+  const transits = renderTransits(chart, { exactTime });
+  if (transits) {
+    result.append(renderUpcoming(chart, {
+      exactTime,
+      onPick: (event) => {
+        transits.showEvent(event);
+        transits.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      },
+    }));
+    result.append(transits);
+  }
+  const skyOffer = renderOffer('sky');
+  if (skyOffer) result.append(skyOffer);
+
+  // Градусы, дома и аспекты нужны тем, кто хочет проверить; остальным они
+  // только мешают дойти до текста, поэтому свернуты.
+  const tech = element('details', 'card tech');
+  tech.append(element('summary', null, 'Технические данные: градусы, дома, аспекты'));
+  tech.append(renderPositions(chart, exactTime));
+  if (exactTime) tech.append(renderAngles(chart));
+  tech.append(renderAspects(chart));
+  if (chart.patterns.length || chart.stelliums.length) tech.append(renderPatterns(chart));
+  result.append(tech);
 
   result.hidden = false;
 }

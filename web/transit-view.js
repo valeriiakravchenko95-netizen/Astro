@@ -1,6 +1,6 @@
 // Раздел «Сейчас в небе»: событие и то, как оно задевает карту.
 
-import { examine, eventsAround, findEvent } from './astro/transits.js';
+import { allEvents, examine, eventsAround, findEvent } from './astro/transits.js';
 import { formatLongitude } from './astro/zodiac.js';
 import { textNodes } from './text.js';
 
@@ -169,7 +169,7 @@ export function renderTransits(chart, { exactTime }) {
     }
   };
 
-  for (const event of events) {
+  const addButton = (event) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.key = event.key + event.date;
@@ -177,9 +177,97 @@ export function renderTransits(chart, { exactTime }) {
     button.setAttribute('aria-pressed', 'false');
     button.addEventListener('click', () => show(event));
     chooser.append(button);
-  }
+  };
+  for (const event of events) addButton(event);
 
   node.append(chooser, body);
   show(chosen);
+
+  // Открыть любое событие календаря, даже если его нет среди кнопок рядом с
+  // сегодняшним днем: так работает список «что заденет тебя».
+  node.showEvent = (event) => {
+    const id = event.key + event.date;
+    if (![...chooser.children].some((button) => button.dataset.key === id)) addButton(event);
+    show(event);
+  };
+  return node;
+}
+
+// --- что из ближайшего заденет именно тебя -------------------------------
+
+// Точки, касание которых человек почувствует лично. Высшие планеты и
+// расчетные точки задеваются годами у целых поколений - их здесь нет.
+const PERSONAL = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'asc', 'mc'];
+
+// Новолуния и полнолуния бывают каждые две недели и задевают что-нибудь
+// почти всегда, поэтому для них допуск уже.
+const LIMIT = { lunation: 1, default: 1.5 };
+
+export function personalEvents(chart, { exactTime, days = 183, today = new Date() } = {}) {
+  const from = today.toISOString().slice(0, 10);
+  const to = new Date(today.getTime() + days * 86400000).toISOString().slice(0, 10);
+  const found = [];
+  for (const event of allEvents()) {
+    if (event.date < from || event.date > to) continue;
+    const report = examine(chart, event.longitude, event.title);
+    const limit = LIMIT[event.kind] ?? LIMIT.default;
+    const hits = report.hits.filter((hit) => PERSONAL.includes(hit.natal)
+      && hit.orb <= limit && (exactTime || hit.natalKind === 'body'));
+    if (hits.length) found.push({ event, hits, weight: weigh(event, hits, limit) });
+  }
+  return found;
+}
+
+// За полгода таких касаний набирается полтора-два десятка. Показываются
+// самые заметные: точнее, по светилам и углам, через напряженные аспекты,
+// затмения и развороты планет.
+const LOUD = new Set(['sun', 'moon', 'asc', 'mc']);
+const HARD = new Set(['conjunction', 'opposition', 'square']);
+
+function weigh(event, hits, limit) {
+  let weight = 0;
+  for (const hit of hits) {
+    weight += (1 - hit.orb / (limit + 0.5))
+      * (LOUD.has(hit.natal) ? 1.3 : 1)
+      * (HARD.has(hit.aspect.key) ? 1.3 : 1);
+  }
+  if (event.kind === 'station') weight += 0.3;
+  if (event.key.endsWith('.solar') || event.key.endsWith('.lunar')) weight += 0.5;
+  return weight;
+}
+
+export function strongestEvents(chart, options = {}, count = 8) {
+  return personalEvents(chart, options)
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, count)
+    .sort((a, b) => a.event.date.localeCompare(b.event.date));
+}
+
+export function renderUpcoming(chart, { exactTime, onPick }) {
+  const found = strongestEvents(chart, { exactTime });
+  const node = element('section', 'card');
+  node.append(element('h2', null, 'Что из ближайшего заденет тебя'));
+  if (!found.length) {
+    node.append(element('p', 'note',
+      'В ближайшие полгода крупных касаний к твоим личным точкам нет.'));
+    return node;
+  }
+  node.append(element('p', 'note',
+    'События неба на полгода вперед, которые ложатся точно на твои личные точки. '
+    + 'Нажми, чтобы прочитать, о чем это.'));
+  const list = element('ul', 'upcoming');
+  for (const { event, hits } of found) {
+    const item = element('li');
+    const button = element('button', null);
+    button.type = 'button';
+    button.append(element('span', 'date', event.date.split('-').reverse().join('.')));
+    button.append(element('span', 'what', event.title));
+    button.append(element('span', 'touch', 'касается: '
+      + hits.map((hit) => `${nameOf(chart, hit)} (${hit.aspect.name.toLowerCase()})`).join(', ')));
+    button.addEventListener('click', () => onPick?.(event));
+    item.append(button);
+    list.append(item);
+  }
+  node.append(list);
   return node;
 }

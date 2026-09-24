@@ -1,7 +1,7 @@
 # Публикация страницы расчёта на GitHub Pages.
 #
 # Включается один раз: в настройках репозитория, раздел Pages, источником
-# нужно выбрать GitHub Actions. После этого каждая правка в ветке main
+# нужно выбрать GitHub Actions. После этого каждая правка в рабочей ветке
 # сама попадает на страницу за пару минут.
 
 name: Публикация страницы
@@ -37,9 +37,16 @@ jobs:
         run: |
           test -s web/data/ephemeris.bin || { echo "нет таблиц эфемерид"; exit 1; }
           test -s web/data/cities.json || { echo "нет списка городов"; exit 1; }
-          python3 -c "import json; json.load(open('web/content/interpretations.json'))"
+          for f in web/content/*.json; do python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"; done
 
-      - uses: actions/configure-pages@v5
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      # Превью ссылки требует полного адреса картинки, а он известен только
+      # здесь: у GitHub Pages свой, у своего домена свой.
+      - name: Подставить адрес сайта
+        run: sed -i "s#__SITE_URL__#${{ steps.pages.outputs.base_url }}#g" web/index.html
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web

@@ -157,3 +157,64 @@ footer { color: var(--muted); font-size: 13px; text-align: center; padding-top: 
 footer a { color: var(--accent); }
 
 [hidden] { display: none !important; }
+
+/* Колесо карты. */
+.wheel { display: block; width: 100%; max-width: 420px; margin: 12px auto 0; }
+.wheel .ring { fill: none; stroke: var(--line); stroke-width: 1.2; }
+.wheel .ring.thin { stroke-width: .8; }
+.wheel .tick { stroke: var(--line); stroke-width: 1; }
+.wheel .cusp { stroke: var(--line); stroke-width: .8; }
+.wheel .axis { stroke: var(--accent); stroke-width: 1.6; }
+.wheel .mark { stroke: var(--muted); stroke-width: 1; }
+.wheel text { text-anchor: middle; dominant-baseline: central; font-family: 'Segoe UI Symbol', 'Noto Sans Symbols', 'Noto Sans Symbols 2', 'Apple Symbols', 'DejaVu Sans', sans-serif; }
+.wheel .sign { font-size: 17px; }
+.wheel .el0 { fill: #b5563a; }
+.wheel .el1 { fill: #6f7b3a; }
+.wheel .el2 { fill: #4f7a94; }
+.wheel .el3 { fill: #4a5f9c; }
+.wheel .planet { font-size: 17px; fill: var(--text); }
+.wheel .planet.retro { fill: var(--muted); }
+.wheel .house { font-size: 10px; fill: var(--muted); }
+.wheel .angle { font-size: 9px; fill: var(--accent); font-weight: 600; }
+.wheel .aspect { stroke-width: 1; opacity: .75; }
+.wheel .aspect.soft { stroke: #4f7a94; }
+.wheel .aspect.hard { stroke: #b5563a; }
+@media (prefers-color-scheme: dark) {
+  .wheel .el0, .wheel .aspect.hard { fill: #e0876b; stroke: #e0876b; }
+  .wheel .el1 { fill: #a9b86b; }
+  .wheel .el2, .wheel .aspect.soft { fill: #7fb0cc; stroke: #7fb0cc; }
+  .wheel .el3 { fill: #8ea0dc; }
+  .wheel .aspect.soft, .wheel .aspect.hard { fill: none; }
+}
+
+/* Что из ближайшего заденет тебя. */
+.upcoming { list-style: none; margin: 12px 0 0; padding: 0; }
+.upcoming li + li { margin-top: 8px; }
+.upcoming button {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; width: 100%;
+  text-align: left; background: var(--surface-sunken); color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  font: inherit; cursor: pointer;
+}
+.upcoming button:hover { border-color: var(--accent); }
+.upcoming .date { grid-row: span 2; font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 600; font-size: 14px; }
+.upcoming .what { font-weight: 600; font-size: 15px; }
+.upcoming .touch { color: var(--muted); font-size: 13px; }
+
+/* Предложение автора под разделом. */
+.offer { background: var(--accent-soft); border-color: transparent; }
+.offer p { margin: 0 0 8px; }
+.offer .button {
+  display: inline-block; margin-top: 4px; padding: 10px 18px; border-radius: 10px;
+  background: var(--accent); color: var(--bg); text-decoration: none; font-weight: 600;
+}
+
+/* Подпись автора в шапке. */
+header .author { margin-top: 10px; font-size: 14px; color: var(--muted); }
+header .author strong { color: var(--text); }
+header .author a { color: var(--accent); }
+
+/* Технические данные свернуты. */
+details.tech > summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+details.tech[open] > summary { margin-bottom: 8px; }
+details.tech > .card { box-shadow: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 14px 0 0; margin: 14px 0 0; }

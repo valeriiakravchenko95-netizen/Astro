@@ -327,6 +327,9 @@ export function renderReadings(chart, { exactTime }) {
   }
 
   node.append(buttons, body);
-  show(topics[0]);
+  // Ссылка вида ?topic=money открывает сразу нужную тему: так пост про
+  // деньги ведет прямо в «Деньги и работа».
+  const asked = new URLSearchParams(location.search).get('topic');
+  show(topics.find((topic) => topic.key === asked) || topics[0]);
   return node;
 }
