@@ -20,7 +20,7 @@ import * as esbuild from 'esbuild';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const web = path.join(root, 'web');
 const dist = path.join(root, 'dist');
-const SITE_URL = (process.env.SITE_URL || 'https://valeri-lume.pages.dev').replace(/\/$/, '');
+const SITE_URL = (process.env.SITE_URL || 'https://valeri-lume.lumeself.workers.dev').replace(/\/$/, '');
 
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, 'content'), { recursive: true });

@@ -72,7 +72,7 @@ Deploy command `npx wrangler deploy`. Имя в `wrangler.jsonc` должно
 | Framework preset | None |
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Переменная `SITE_URL` | адрес сайта, если он отличается от `https://valeri-lume.pages.dev` |
+| Переменная `SITE_URL` | адрес сайта, если он отличается от `https://valeri-lume.lumeself.workers.dev` |
 
 Сборка (`scripts/build-site.mjs`) кладет в `dist/` только то, что нужно
 браузеру: сжатый в один файл код, стили, таблицы эфемерид, список городов,
