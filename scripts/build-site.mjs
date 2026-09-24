@@ -7,8 +7,8 @@
 //   становится трудно;
 // - тексты трактовок в dist/ не попадают вовсе: их отдает серверная функция
 //   functions/api/texts.js, по несколько десятков под конкретную карту;
-// - на страницу идет только список тем и закрепленное событие
-//   (content/public.json) и подпись автора (content/site.json);
+// - на страницу идет только список тем, закрепленное событие и условия
+//   проверок под рилсы без текстов (content/public.json) и подпись автора (content/site.json);
 // - в превью ссылки подставляется адрес сайта: SITE_URL из настроек
 //   Cloudflare, а если его нет - адрес по умолчанию ниже.
 
@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
+import { stripCheckTexts } from '../web/checks.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const web = path.join(root, 'web');
@@ -35,6 +36,7 @@ const read = (name) => JSON.parse(fs.readFileSync(path.join(web, 'content', name
 fs.writeFileSync(path.join(dist, 'content', 'public.json'), JSON.stringify({
   topics: read('interpretations.json').topics,
   featured: read('transits.json').featured || null,
+  checks: stripCheckTexts(read('checks.json')),
 }));
 
 await esbuild.build({

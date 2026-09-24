@@ -6,7 +6,7 @@
 
 // Одной карте нужно несколько десятков текстов. Запрос на сотни - это
 // попытка выкачать все, а не чья-то карта.
-const LIMITS = { natal: 120, sky: 200 };
+const LIMITS = { natal: 120, sky: 200, checks: 40 };
 
 function pick(source, wanted, limit) {
   const found = {};
@@ -32,7 +32,7 @@ function reply(body, status = 200) {
   });
 }
 
-export async function handleTexts(request, natal, sky) {
+export async function handleTexts(request, natal, sky, checks = {}) {
   if (request.method !== 'POST') return reply({ error: 'method not allowed' }, 405);
   // Чужие сайты не могут подтягивать тексты к себе: браузер присылает
   // адрес страницы, с которой идет запрос, и он должен совпадать с нашим.
@@ -49,5 +49,6 @@ export async function handleTexts(request, natal, sky) {
   return reply({
     natal: pick(natal.texts, body?.natal, LIMITS.natal),
     sky: pick(sky, body?.sky, LIMITS.sky),
+    checks: pick(checks, body?.checks, LIMITS.checks),
   });
 }

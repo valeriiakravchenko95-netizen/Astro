@@ -15,6 +15,9 @@ import { renderWheel } from './wheel.js';
 import { loadSite, renderAuthor, renderOffer } from './site.js';
 import { loadEvents } from './astro/transits.js';
 import { setGender } from './text.js';
+import {
+  loadChecks, askedCheck, neededCheckTexts, addCheckTexts, renderCheck,
+} from './checks.js';
 
 const form = document.getElementById('form');
 const dateInput = document.getElementById('date');
@@ -48,6 +51,7 @@ async function boot() {
       loadTransitTexts(),
       loadSite().then(() => renderAuthor(document.querySelector('header'))),
       fetch('content/public.json').then((response) => { published = response.ok; }, () => {}),
+      loadChecks(),
     ]);
     ephemeris = loaded;
     submit.disabled = false;
@@ -110,12 +114,14 @@ async function fetchTexts(chart, exactTime) {
     body: JSON.stringify({
       natal: neededTexts(chart, exactTime),
       sky: neededSkyTexts(chart, exactTime),
+      checks: neededCheckTexts(askedCheck()),
     }),
   });
   if (!response.ok) throw new Error('Не удалось загрузить тексты, попробуй еще раз');
   const payload = await response.json();
   addTexts(payload.natal);
   addSkyTexts(payload.sky);
+  addCheckTexts(payload.checks?.checks);
 }
 
 form.addEventListener('submit', async (event) => {
@@ -179,6 +185,26 @@ function card(title) {
 function render(chart, exactTime) {
   result.replaceChildren();
 
+  // Короткий режим под рилс: ссылка ?check=... показывает только эту
+  // проверку и приглашение, а полная карта раскрывается кнопкой.
+  const check = askedCheck();
+  let target = result;
+  if (check) {
+    result.append(renderCheck(chart, check));
+    const offer = renderOffer('readings');
+    if (offer) result.append(offer);
+    const more = element('button', 'more', 'Показать всю мою карту');
+    more.type = 'button';
+    target = element('div');
+    target.hidden = true;
+    more.addEventListener('click', () => {
+      target.hidden = false;
+      more.remove();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    result.append(more, target);
+  }
+
   const { name, where } = label(chosenPlace);
   const local = chart.moment;
   const head = card();
@@ -203,27 +229,27 @@ function render(chart, exactTime) {
       + 'Взят первый.'));
   }
   head.append(renderWheel(chart, { exactTime }));
-  result.append(head);
+  target.append(head);
 
   // Сначала то, ради чего человек пришел: разбор по теме. Небо и цифры ниже.
   const readings = renderReadings(chart, { exactTime });
-  if (readings) result.append(readings);
-  const readingsOffer = renderOffer('readings');
-  if (readingsOffer) result.append(readingsOffer);
+  if (readings) target.append(readings);
+  const readingsOffer = check ? null : renderOffer('readings');
+  if (readingsOffer) target.append(readingsOffer);
 
   const transits = renderTransits(chart, { exactTime });
   if (transits) {
-    result.append(renderUpcoming(chart, {
+    target.append(renderUpcoming(chart, {
       exactTime,
       onPick: (event) => {
         transits.showEvent(event);
         transits.scrollIntoView({ behavior: 'smooth', block: 'start' });
       },
     }));
-    result.append(transits);
+    target.append(transits);
   }
   const skyOffer = renderOffer('sky');
-  if (skyOffer) result.append(skyOffer);
+  if (skyOffer) target.append(skyOffer);
 
   // Градусы, дома и аспекты нужны тем, кто хочет проверить; остальным они
   // только мешают дойти до текста, поэтому свернуты.
@@ -233,7 +259,7 @@ function render(chart, exactTime) {
   if (exactTime) tech.append(renderAngles(chart));
   tech.append(renderAspects(chart));
   if (chart.patterns.length || chart.stelliums.length) tech.append(renderPatterns(chart));
-  result.append(tech);
+  target.append(tech);
 
   result.hidden = false;
 }
