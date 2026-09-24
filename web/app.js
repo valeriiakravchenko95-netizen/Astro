@@ -18,7 +18,7 @@ import {
   loadSite, renderAuthor, renderOffer, siteSettings, instagramNick,
 } from './site.js';
 import { loadEvents } from './astro/transits.js';
-import { setGender } from './text.js';
+import { setGender, textNodes } from './text.js';
 import {
   loadChecks, askedCheck, neededCheckTexts, addCheckTexts, renderCheck,
 } from './checks.js';
@@ -55,7 +55,7 @@ async function boot() {
       loadTransitTexts(),
       loadSite().then(() => {
         renderAuthor(document.querySelector('header'));
-        setOpenCards(siteSettings().showcase_open);
+        setOpenCards(siteSettings().showcase_open, siteSettings().showcase_note);
       }),
       fetch('content/public.json').then((response) => { published = response.ok; }, () => {}),
       loadChecks(),
@@ -113,8 +113,19 @@ unknownTime.addEventListener('change', () => {
 
 // Тексты для этой карты: только те, что она покажет. Весь набор целиком
 // на страницу не попадает.
+// Детская карта: по методу для детей прогностика выключена, а взрослые темы
+// (деньги, отношения) к ребенку неприменимы. Показываем только саму карту.
+function isChild(year, month, day) {
+  const limit = Number(siteSettings().child_age) || 0;
+  if (!limit) return false;
+  const now = new Date();
+  let age = now.getFullYear() - year;
+  if (now.getMonth() + 1 < month || (now.getMonth() + 1 === month && now.getDate() < day)) age -= 1;
+  return age < limit;
+}
+
 async function fetchTexts(chart, exactTime) {
-  if (!published) return;
+  if (!published || chart.child) return;
   const response = await fetch('api/texts', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -161,6 +172,7 @@ form.addEventListener('submit', async (event) => {
       // автора трактовок: Скорпион - Плутон, Водолей - Уран, Рыбы - Нептун.
       rulerScheme: MODERN,
     });
+    chart.child = isChild(year, month, day);
     submit.disabled = true;
     setStatus('Считаю...');
     await fetchTexts(chart, exactTime);
@@ -194,6 +206,11 @@ function render(chart, exactTime) {
 
   // Короткий режим под рилс: ссылка ?check=... показывает только эту
   // проверку и приглашение, а полная карта раскрывается кнопкой.
+  if (chart.child) {
+    renderChild(chart, exactTime);
+    return;
+  }
+
   const check = askedCheck();
   let target = result;
   if (check) {
@@ -268,6 +285,36 @@ function render(chart, exactTime) {
   if (chart.patterns.length || chart.stelliums.length) tech.append(renderPatterns(chart));
   target.append(tech);
 
+  result.hidden = false;
+}
+
+function renderChild(chart, exactTime) {
+  const { name } = label(chosenPlace);
+  const head = card();
+  head.append(element('h2', null, 'Карта ребенка'));
+  head.append(element('p', 'note',
+    `${name} · ${dateInput.value.split('-').reverse().join('.')}`
+    + (exactTime ? ` ${timeInput.value}` : '')));
+  head.append(renderWheel(chart, { exactTime }));
+  result.append(head);
+
+  const note = card();
+  note.classList.add('child');
+  note.append(...textNodes(siteSettings().child_note || 'Это карта ребенка.'));
+  if (siteSettings().dm_url) {
+    const link = element('a', 'button', 'Написать в директ');
+    link.href = siteSettings().dm_url;
+    link.rel = 'noopener';
+    note.append(link);
+  }
+  result.append(note);
+
+  const tech = element('details', 'card tech');
+  tech.append(element('summary', null, 'Технические данные: градусы, дома, аспекты'));
+  tech.append(renderPositions(chart, exactTime));
+  if (exactTime) tech.append(renderAngles(chart));
+  tech.append(renderAspects(chart));
+  result.append(tech);
   result.hidden = false;
 }
 

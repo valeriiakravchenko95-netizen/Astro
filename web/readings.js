@@ -41,9 +41,11 @@ export async function loadInterpretations() {
 // Сколько карточек в теме показывать с текстом. Остальные - витрина:
 // заголовок и «подробно на консультации». Ноль или пусто - все открыты.
 let openCards = 0;
+let closingNote = '';
 
-export function setOpenCards(count) {
+export function setOpenCards(count, note = '') {
   openCards = Number(count) || 0;
+  closingNote = note || '';
 }
 
 export function neededTexts(chart, exactTime) {
@@ -321,17 +323,9 @@ export function renderReadings(chart, { exactTime }) {
     const shown = new Set();
     let opened = 0;
     for (const factor of factors) {
-      if (openCards && opened >= openCards) {
-        const item = document.createElement('div');
-        item.className = 'reading locked';
-        const title = document.createElement('h3');
-        title.textContent = factor.title;
-        const note = document.createElement('p');
-        note.textContent = 'Подробно - на консультации';
-        item.append(title, note);
-        body.append(item);
-        continue;
-      }
+      // Сверх открытых карточек ничего не показываем: отдельные положения
+      // и так есть в открытом доступе, ценность консультации - в их связке.
+      if (openCards && opened >= openCards) break;
       const own = text(factor.section, factor.id);
       const candidates = own
         ? [{ section: factor.section, key: factor.id, raw: own }]
@@ -372,13 +366,24 @@ export function renderReadings(chart, { exactTime }) {
     }
   };
 
+  const showWithNote = show;
+  const withNote = (topic) => {
+    showWithNote(topic);
+    if (openCards && closingNote) {
+      const note = document.createElement('p');
+      note.className = 'closing';
+      note.textContent = closingNote;
+      body.append(note);
+    }
+  };
+
   for (const topic of topics) {
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.key = topic.key;
     button.textContent = topic.name;
     button.setAttribute('aria-pressed', 'false');
-    button.addEventListener('click', () => show(topic));
+    button.addEventListener('click', () => withNote(topic));
     buttons.append(button);
   }
 
@@ -386,6 +391,6 @@ export function renderReadings(chart, { exactTime }) {
   // Ссылка вида ?topic=money открывает сразу нужную тему: так пост про
   // деньги ведет прямо в «Деньги и работа».
   const asked = new URLSearchParams(location.search).get('topic');
-  show(topics.find((topic) => topic.key === asked) || topics[0]);
+  withNote(topics.find((topic) => topic.key === asked) || topics[0]);
   return node;
 }
