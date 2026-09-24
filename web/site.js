@@ -21,6 +21,16 @@ function instagramUrl(handle) {
   return /^https?:\/\//.test(clean) ? clean : `https://instagram.com/${clean}`;
 }
 
+export function siteSettings() {
+  return site;
+}
+
+export function instagramNick() {
+  const handle = String(site.author?.instagram || '').trim()
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '').replace(/^@/, '');
+  return handle ? `@${handle}` : '';
+}
+
 export function renderAuthor(container) {
   const { name, instagram, about } = site.author || {};
   if (!name && !instagram && !about) return;

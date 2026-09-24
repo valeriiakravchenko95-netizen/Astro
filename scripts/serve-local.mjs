@@ -24,14 +24,21 @@ const TYPES = {
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
-  if (url.pathname === '/api/texts') {
+  if (url.pathname === '/api/texts' || (!path.extname(url.pathname) && url.pathname !== '/')) {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const request = new Request(url, {
       method: req.method, headers: req.headers,
       body: req.method === 'POST' ? Buffer.concat(chunks) : undefined,
     });
-    const response = await worker.fetch(request, {});
+    // Файлы страницы для точки входа отдаются отсюда же, как это делает Cloudflare.
+    const assets = {
+      fetch: async (inner) => {
+        const file = path.join(dist, new URL(inner.url).pathname.replace(/\/$/, '/index.html'));
+        return new Response(fs.readFileSync(file), { headers: { 'content-type': TYPES[path.extname(file)] || 'text/html' } });
+      },
+    };
+    const response = await worker.fetch(request, { ASSETS: assets });
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(await response.text());
     return;

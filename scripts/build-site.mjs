@@ -26,9 +26,10 @@ const SITE_URL = (process.env.SITE_URL || 'https://valeri-lume.lumeself.workers.
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(path.join(dist, 'content'), { recursive: true });
 
-for (const file of ['favicon.svg', 'preview.png']) {
+for (const file of ['favicon.svg', 'logo.svg', 'preview.png']) {
   fs.copyFileSync(path.join(web, file), path.join(dist, file));
 }
+fs.cpSync(path.join(web, 'fonts'), path.join(dist, 'fonts'), { recursive: true });
 fs.cpSync(path.join(web, 'data'), path.join(dist, 'data'), { recursive: true });
 fs.copyFileSync(path.join(web, 'content', 'site.json'), path.join(dist, 'content', 'site.json'));
 
@@ -56,9 +57,18 @@ await esbuild.build({
   charset: 'utf8',
 });
 
+// Статистика Cloudflare Web Analytics: без cookies и без личных данных,
+// считает только посещения страниц. Включается, когда в content/site.json
+// вписан analytics_token.
+const site = read('site.json');
+const beacon = site.analytics_token
+  ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='${JSON.stringify({ token: site.analytics_token })}'></script>\n`
+  : '';
+
 const html = fs.readFileSync(path.join(web, 'index.html'), 'utf8')
   .replace(/<!--[\s\S]*?-->\n?/g, '')
-  .replaceAll('__SITE_URL__', SITE_URL);
+  .replaceAll('__SITE_URL__', SITE_URL)
+  .replace('</body>', `${beacon}</body>`);
 fs.writeFileSync(path.join(dist, 'index.html'), html);
 
 // Поисковикам незачем индексировать служебные адреса.

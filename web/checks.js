@@ -8,7 +8,8 @@
 
 import { SIGNS_IN, norm180, signIndex } from './astro/zodiac.js';
 import { rulerOf, TRADITIONAL } from './astro/rulers.js';
-import { textNodes } from './text.js';
+import { textNodes, inGender } from './text.js';
+import { allEvents, examine } from './astro/transits.js';
 
 let definitions = [];
 let texts = {};
@@ -53,10 +54,13 @@ export function flattenCheckTexts(full) {
   return flat;
 }
 
+// Что из проверки можно отдать странице заранее: условия, заголовки,
+// кодовое слово. Тексты - только с сервера.
+const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share'];
+
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
-    key: check.key,
-    title: check.title,
+    ...Object.fromEntries(PUBLIC_FIELDS.filter((field) => field in check).map((field) => [field, check[field]])),
     indicators: (check.indicators || []).map(({ id, title, when }) => ({ id, title, when })),
   }));
 }
@@ -65,9 +69,15 @@ export function addCheckTexts(more) {
   texts = { ...texts, ...(more || {}) };
 }
 
+// Проверку можно открыть ссылкой ?check=big-money или короткой ссылкой
+// /dengi - по полю slug. Короткие ссылки удобнее в сторис и видны в
+// статистике по отдельности.
 export function askedCheck() {
   const key = new URLSearchParams(location.search).get('check');
-  return definitions.find((check) => check.key === key) || null;
+  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, '').toLowerCase();
+  return definitions.find((check) => check.key === key)
+    || definitions.find((check) => path && (check.slug === path || check.key === path))
+    || null;
 }
 
 export function neededCheckTexts(check) {
@@ -253,16 +263,210 @@ function plural(count, one, few, many) {
   return many;
 }
 
-export function renderCheck(chart, check) {
+// --- «еще N мест в твоей карте» ---------------------------------------------
+//
+// Места карты, которые тоже влияют на тему, - только названиями. Что они
+// значат и как связаны между собой, остается для консультации.
+
+function morePlaces(chart, check, already) {
+  if (!chart.exactTime || !check.more) return [];
+  const found = [];
+  // Место, уже названное среди найденных показателей, второй раз не идет:
+  // сверяем по «планета в доме», в каком бы обороте оно ни стояло.
+  const seen = (planetInHouse) => already.some((line) => line.includes(planetInHouse))
+    || found.some((line) => line.includes(planetInHouse));
+  const add = (label, planetInHouse = label) => {
+    if (!seen(planetInHouse)) found.push(label);
+  };
+  for (const spec of check.more) {
+    if (spec.ruler) {
+      const ruler = houseRuler(chart, spec.ruler);
+      const position = chart.positions.get(ruler);
+      if (position) {
+        const place = `${position.body.name} в ${position.house} доме`;
+        add(`управитель ${spec.ruler} дома ${place}`, place);
+      }
+    }
+    if (spec.planets_in) {
+      for (const body of [...PLANETS, 'true_node']) {
+        const position = chart.positions.get(body);
+        if (position && list(spec.planets_in).includes(position.house)) {
+          add(`${position.body.name} в ${position.house} доме`);
+        }
+      }
+    }
+    if (spec.ruler_aspects) {
+      const ruler = houseRuler(chart, spec.ruler_aspects);
+      for (const hit of chart.aspects) {
+        if (hit.bodyA !== ruler && hit.bodyB !== ruler) continue;
+        if (!PLANETS.includes(hit.bodyA) || !PLANETS.includes(hit.bodyB)) continue;
+        add(`${name(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${name(chart, hit.bodyB)}`);
+      }
+    }
+  }
+  return found.slice(0, 5);
+}
+
+// --- периоды на год вперед ----------------------------------------------------
+//
+// Месяцы, когда события неба точно ложатся на личные точки карты и задевают
+// дома этой темы. Только месяцы: что в них делать - консультация.
+
+const PERSONAL = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'asc', 'mc'];
+const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август',
+  'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+
+export function topicPeriods(chart, houses, { days = 365, today = new Date(), max = 4 } = {}) {
+  if (!chart.exactTime || !houses?.length) return [];
+  const from = today.toISOString().slice(0, 10);
+  const to = new Date(today.getTime() + days * 86400000).toISOString().slice(0, 10);
+  const months = [];
+  for (const event of allEvents()) {
+    if (event.date < from || event.date > to) continue;
+    const limit = event.kind === 'lunation' ? 1 : 1.5;
+    const report = examine(chart, event.longitude, event.title);
+    const personal = report.hits.some((hit) => PERSONAL.includes(hit.natal) && hit.orb <= limit);
+    if (!personal || !report.housesTouched.some((house) => houses.includes(house))) continue;
+    const [year, month] = event.date.split('-').map(Number);
+    const label = `${MONTHS[month - 1]} ${year}`;
+    if (!months.includes(label)) months.push(label);
+  }
+  return months.slice(0, max);
+}
+
+// --- картинка для сторис -------------------------------------------------------
+
+async function storyImage({ title, big, small, lines, link, nick }) {
+  const width = 1080;
+  const height = 1920;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  try {
+    await Promise.all([
+      document.fonts.load('400 80px Cormorant'), document.fonts.load('italic 400 80px Cormorant'),
+    ]);
+  } catch (error) {
+    // без шрифта нарисуется запасным
+  }
+  const serif = "Cormorant, 'Cormorant Garamond', Georgia, serif";
+  ctx.fillStyle = '#f5f1e8';
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = '#a8875a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(60, 60, width - 120, height - 120);
+
+  // логотип
+  const logo = new Image();
+  const svg = await (await fetch('logo.svg')).text();
+  logo.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace('currentColor', '#a8875a'))}`;
+  await logo.decode().catch(() => {});
+  ctx.drawImage(logo, width / 2 - 60, 170, 120, 120);
+  ctx.fillStyle = '#1f1a15';
+  ctx.textAlign = 'center';
+  ctx.font = '600 30px -apple-system, Helvetica, sans-serif';
+  ctx.fillText('L U M E', width / 2, 350);
+
+  const wrap = (text, font, maxWidth) => {
+    ctx.font = font;
+    const words = text.split(' ');
+    const rows = [];
+    let row = '';
+    for (const word of words) {
+      const test = row ? `${row} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && row) {
+        rows.push(row);
+        row = word;
+      } else row = test;
+    }
+    if (row) rows.push(row);
+    return rows;
+  };
+
+  let y = 520;
+  for (const row of wrap(title, `400 78px ${serif}`, 860)) {
+    ctx.fillText(row, width / 2, y);
+    y += 88;
+  }
+  y += 70;
+  ctx.fillStyle = '#8a6c43';
+  ctx.font = `400 260px ${serif}`;
+  ctx.fillText(big, width / 2, y + 170);
+  y += 320;
+  ctx.fillStyle = '#7a6f63';
+  ctx.font = `italic 400 54px ${serif}`;
+  ctx.fillText(small, width / 2, y);
+  y += 110;
+
+  ctx.fillStyle = '#1f1a15';
+  for (const line of lines.slice(0, 6)) {
+    for (const row of wrap(line, `400 46px ${serif}`, 800)) {
+      ctx.fillText(row, width / 2, y);
+      y += 58;
+    }
+    y += 18;
+  }
+
+  ctx.fillStyle = '#a8875a';
+  ctx.fillRect(width / 2 - 30, height - 330, 60, 2);
+  ctx.fillStyle = '#1f1a15';
+  ctx.font = `italic 400 48px ${serif}`;
+  ctx.fillText('Проверь свою карту', width / 2, height - 250);
+  ctx.font = '500 34px -apple-system, Helvetica, sans-serif';
+  ctx.fillStyle = '#7a6f63';
+  ctx.fillText(link, width / 2, height - 190);
+  if (nick) ctx.fillText(nick, width / 2, height - 140);
+
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
+async function shareStory(options, holder) {
+  const blob = await storyImage(options);
+  if (!blob) return;
+  const file = new File([blob], 'lume.png', { type: 'image/png' });
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+    }
+  }
+  // Встроенный браузер инстаграма делиться файлами не умеет: показываем
+  // картинку, ее можно сохранить долгим нажатием.
+  holder.replaceChildren();
+  const image = element('img');
+  image.src = URL.createObjectURL(blob);
+  image.alt = 'Картинка для сторис';
+  image.className = 'story';
+  holder.append(element('p', 'note', 'Нажми на картинку и удерживай, чтобы сохранить.'), image);
+}
+
+// --- вывод проверки --------------------------------------------------------------
+
+export function renderCheck(chart, check, { dmUrl = '', nick = '' } = {}) {
   const { results, yes, no, unknown } = runCheck(chart, check);
   const node = element('section', 'card check-card');
   node.append(element('h2', null, check.title));
 
+  // Счет мягкий: «из восьми» показываем, только когда совпало много, -
+  // «1 из 8» читается как приговор, а это противоречит методу.
   const total = results.length - unknown.length;
-  const score = element('p', 'score');
-  score.append(element('strong', null, `${yes.length} из ${total}`));
-  score.append(document.createTextNode(` ${plural(total, 'показателя', 'показателей', 'показателей')} в твоей карте`));
-  node.append(score);
+  let big = '';
+  let small = '';
+  if (yes.length >= 3) {
+    big = `${yes.length} из ${total}`;
+    small = `${plural(total, 'показателя', 'показателей', 'показателей')} в твоей карте`;
+  } else if (yes.length > 0) {
+    big = String(yes.length);
+    small = `${plural(yes.length, 'показатель', 'показателя', 'показателей')} в твоей карте`;
+  }
+  if (big) {
+    const score = element('p', 'score');
+    score.append(element('strong', null, big), document.createTextNode(small));
+    node.append(score);
+  }
 
   const summary = texts[`${check.key}.${yes.length === 0 ? 'none' : (yes.length <= 2 ? 'few' : 'many')}`];
   if (summary) node.append(...textNodes(summary));
@@ -279,7 +483,7 @@ export function renderCheck(chart, check) {
   }
 
   if (no.length) {
-    const rest = element('div', 'reading rest');
+    const rest = element('div', 'rest');
     rest.append(element('h3', null, 'Остальные показатели из списка'));
     const items = element('ul');
     for (const { item } of no) items.append(element('li', null, item.title));
@@ -293,7 +497,54 @@ export function renderCheck(chart, check) {
       + 'зависят от времени рождения - без него их не проверить.'));
   }
 
+  const places = morePlaces(chart, check, yes.map((r) => r.because));
+  if (places.length) {
+    const box = element('div', 'more-places');
+    box.append(element('h3', null,
+      `Еще ${places.length} ${plural(places.length, 'место', 'места', 'мест')} в твоей карте влияют на эту тему`));
+    const items = element('ul');
+    for (const label of places) items.append(element('li', null, label));
+    box.append(items);
+    box.append(element('p', 'note', 'Как они связаны с тем, что выше, и что с ними делать, разбираю на консультации.'));
+    node.append(box);
+  }
+
+  const months = topicPeriods(chart, check.houses);
+  if (months.length) {
+    const box = element('div', 'periods');
+    box.append(element('h3', null, 'Периоды в ближайший год, которые задевают эту тему'));
+    box.append(element('p', 'months', months.join(' · ')));
+    box.append(element('p', 'note', 'Что в каждом из них делать - тоже тема консультации.'));
+    node.append(box);
+  }
+
   const outro = texts[`${check.key}.outro`];
   if (outro) node.append(...textNodes(outro));
+
+  if (check.code_word) {
+    const cta = element('div', 'cta');
+    cta.append(...textNodes(inGender(check.cta || 'Хочешь разобрать, как это работает именно у тебя? Напиши мне в директ слово')));
+    cta.append(element('span', 'word', check.code_word));
+    if (dmUrl) {
+      const link = element('a', 'button', 'Написать в директ');
+      link.href = dmUrl;
+      link.rel = 'noopener';
+      cta.append(link);
+    }
+    node.append(cta);
+  }
+
+  const share = element('button', 'share', 'Сохранить результат для сторис');
+  share.type = 'button';
+  const holder = element('div', 'story-holder');
+  share.addEventListener('click', () => shareStory({
+    title: check.share || check.title,
+    big: big || '·',
+    small: big ? small : 'моя карта',
+    lines: yes.map((r) => r.item.title),
+    link: `${location.host}${check.slug ? `/${check.slug}` : `/?check=${check.key}`}`,
+    nick,
+  }, holder));
+  node.append(share, holder);
   return node;
 }

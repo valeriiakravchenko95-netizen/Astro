@@ -21,3 +21,4 @@
 | NumPy | NumPy Developers | BSD |
 | tzdata | Python Software Foundation | Apache 2.0 |
 | aiogram (бот) | aiogram team | MIT |
+| Шрифт Cormorant Garamond | Christian Thalmann | SIL Open Font License 1.1 |

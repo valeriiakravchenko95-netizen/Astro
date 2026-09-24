@@ -38,10 +38,21 @@ export async function loadInterpretations() {
 }
 
 // Какие тексты понадобятся этой карте во всех темах: точные ключи и куски.
+// Сколько карточек в теме показывать с текстом. Остальные - витрина:
+// заголовок и «подробно на консультации». Ноль или пусто - все открыты.
+let openCards = 0;
+
+export function setOpenCards(count) {
+  openCards = Number(count) || 0;
+}
+
 export function neededTexts(chart, exactTime) {
   const wanted = [];
   for (const topic of content.topics || []) {
-    for (const factor of collectFactors(chart, topic.key, exactTime)) {
+    // Тексты закрытых карточек не запрашиваются вовсе: их нет на странице.
+    // Запас в две карточки - на случай, если у первых текста не окажется.
+    const factors = collectFactors(chart, topic.key, exactTime);
+    for (const factor of openCards ? factors.slice(0, openCards + 2) : factors) {
       wanted.push([factor.section, factor.id]);
       for (const piece of factor.parts || []) wanted.push([piece.section, piece.key]);
     }
@@ -308,7 +319,19 @@ export function renderReadings(chart, { exactTime }) {
     // втором доме может прийти и как «планета в доме», и как «кто стоит
     // во втором доме».
     const shown = new Set();
+    let opened = 0;
     for (const factor of factors) {
+      if (openCards && opened >= openCards) {
+        const item = document.createElement('div');
+        item.className = 'reading locked';
+        const title = document.createElement('h3');
+        title.textContent = factor.title;
+        const note = document.createElement('p');
+        note.textContent = 'Подробно - на консультации';
+        item.append(title, note);
+        body.append(item);
+        continue;
+      }
       const own = text(factor.section, factor.id);
       const candidates = own
         ? [{ section: factor.section, key: factor.id, raw: own }]
@@ -344,6 +367,7 @@ export function renderReadings(chart, { exactTime }) {
         }
         item.append(...textNodes(piece.raw));
       }
+      if (pieces.length) opened += 1;
       body.append(item);
     }
   };

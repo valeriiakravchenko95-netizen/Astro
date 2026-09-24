@@ -7,12 +7,16 @@ import { PLACIDUS, WHOLE_SIGN } from './astro/houses.js';
 import { formatLongitude, SIGN_GLYPHS } from './astro/zodiac.js';
 import { formatOffset } from './astro/timezone.js';
 import { label, loadCities, search } from './places.js';
-import { renderReadings, loadInterpretations, neededTexts, addTexts } from './readings.js';
+import {
+  renderReadings, loadInterpretations, neededTexts, addTexts, setOpenCards,
+} from './readings.js';
 import {
   renderTransits, renderUpcoming, loadTransitTexts, neededSkyTexts, addSkyTexts,
 } from './transit-view.js';
 import { renderWheel } from './wheel.js';
-import { loadSite, renderAuthor, renderOffer } from './site.js';
+import {
+  loadSite, renderAuthor, renderOffer, siteSettings, instagramNick,
+} from './site.js';
 import { loadEvents } from './astro/transits.js';
 import { setGender } from './text.js';
 import {
@@ -49,7 +53,10 @@ async function boot() {
       loadInterpretations(),
       loadEvents(),
       loadTransitTexts(),
-      loadSite().then(() => renderAuthor(document.querySelector('header'))),
+      loadSite().then(() => {
+        renderAuthor(document.querySelector('header'));
+        setOpenCards(siteSettings().showcase_open);
+      }),
       fetch('content/public.json').then((response) => { published = response.ok; }, () => {}),
       loadChecks(),
     ]);
@@ -190,8 +197,8 @@ function render(chart, exactTime) {
   const check = askedCheck();
   let target = result;
   if (check) {
-    result.append(renderCheck(chart, check));
-    const offer = renderOffer('readings');
+    result.append(renderCheck(chart, check, { dmUrl: siteSettings().dm_url, nick: instagramNick() }));
+    const offer = check.code_word ? null : renderOffer('readings');
     if (offer) result.append(offer);
     const more = element('button', 'more', 'Показать всю мою карту');
     more.type = 'button';
@@ -205,12 +212,12 @@ function render(chart, exactTime) {
     result.append(more, target);
   }
 
-  const { name, where } = label(chosenPlace);
+  const { name } = label(chosenPlace);
   const local = chart.moment;
   const head = card();
   head.append(element('h2', null, 'Твоя карта'));
   head.append(element('p', 'note',
-    `${name}, ${where.split(',')[0]} · ${dateInput.value.split('-').reverse().join('.')}`
+    `${name} · ${dateInput.value.split('-').reverse().join('.')}`
     + (exactTime ? ` ${timeInput.value}` : '')
     + ` · ${formatOffset(local.offsetMinutes)}`));
 
