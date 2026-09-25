@@ -110,9 +110,10 @@ Variables → Build variables.
 ## Что можно менять свободно
 
 - Дизайн: цвета заданы переменными в начале `web/style.css`, светлая и
-  темная тема. Знак lume - `web/logo.svg`, иконки - `favicon.svg`,
-  `apple-touch-icon.png`, превью ссылки - `preview.png`
-  (`scripts/make_preview.py`).
+  темная тема. Подпись «астролог Валерия Кравченко» - в шапке
+  `web/index.html`, иконки - `favicon.svg`, `apple-touch-icon.png`, превью
+  ссылки - `preview.png` (`scripts/make_preview.py`). Знак lume лежит в
+  `web/logo.svg` про запас, на странице сейчас не используется.
 - Тексты, темы, проверки, ссылки под рилсы: файлы в `web/content/`, без
   кода.
 - Аналитика: в `site.json` поле `analytics_token` для Cloudflare Web

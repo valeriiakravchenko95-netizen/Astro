@@ -53,7 +53,7 @@ export async function rewriteMeta(page, {
 }) {
   let html = await page.text();
   html = html
-    .replace(/<title>[^<]*<\/title>/, `<title>${escape(title)} · Lume</title>`)
+    .replace(/<title>[^<]*<\/title>/, `<title>${escape(title)} · Валерия Кравченко</title>`)
     .replace(/(<meta property="og:title" content=")[^"]*"/, `$1${escape(title)}"`)
     .replace(/(<meta property="og:description" content=")[^"]*"/, `$1${escape(description)}"`);
   if (heading) {

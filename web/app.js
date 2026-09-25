@@ -88,7 +88,7 @@ function applyLanding() {
   const lead = header.querySelector('h1 + p');
   if (lead) lead.textContent = heading.lead;
   header.classList.add('landing');
-  document.title = `${heading.title} · Lume`;
+  document.title = `${heading.title} · Валерия Кравченко`;
 }
 
 async function boot() {
@@ -171,13 +171,19 @@ function isChild(year, month, day) {
   return age < limit;
 }
 
+// Пришли по ссылке из рилса (проверка или событие неба): страница только
+// про это, разбора натальной карты по темам здесь нет.
+function fromReel() {
+  return Boolean(askedCheck() || askedEvent());
+}
+
 async function fetchTexts(chart, exactTime) {
   if (!published) return;
   // Для детской карты - только тексты детской витрины.
   const request = chart.child
     ? { natal: neededTexts(chart, exactTime, childTopics()) }
     : {
-      natal: neededTexts(chart, exactTime),
+      natal: fromReel() ? [] : neededTexts(chart, exactTime),
       sky: neededSkyTexts(chart, exactTime),
       checks: neededCheckTexts(askedCheck()),
     };
@@ -286,7 +292,7 @@ function render(chart, exactTime) {
     result.append(renderCheck(chart, check, { dmUrl: siteSettings().dm_url, nick: instagramNick() }));
     const offer = check.code_word ? null : renderOffer('readings');
     if (offer) result.append(offer);
-    const more = element('button', 'more', 'Показать всю мою карту');
+    const more = element('button', 'more', 'Показать мою карту');
     more.type = 'button';
     target = element('div');
     target.hidden = true;
@@ -346,10 +352,13 @@ function render(chart, exactTime) {
   }
 
   // Сначала то, ради чего человек пришел: разбор по теме. Небо и цифры ниже.
-  const readings = renderReadings(chart, { exactTime });
-  if (readings) target.append(readings);
-  const readingsOffer = check ? null : renderOffer('readings');
-  if (readingsOffer) target.append(readingsOffer);
+  // По ссылке из рилса разбора по темам нет - страница только про рилс.
+  if (!fromReel()) {
+    const readings = renderReadings(chart, { exactTime });
+    if (readings) target.append(readings);
+    const readingsOffer = renderOffer('readings');
+    if (readingsOffer) target.append(readingsOffer);
+  }
 
   if (!eventFirst) {
     if (transits) target.append(upcoming, transits);

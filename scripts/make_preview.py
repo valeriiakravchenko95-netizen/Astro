@@ -23,9 +23,6 @@ def page():
     site = json.loads((WEB / 'content' / 'site.json').read_text(encoding='utf-8'))
     author = site.get('author', {})
     nick = ('@' + author['instagram'].lstrip('@')) if author.get('instagram') else ''
-    mark = (WEB / 'logo.svg').read_text(encoding='utf-8')
-    logo = mark.replace('currentColor', '#a8875a')
-    white = mark.replace('currentColor', '#fff').replace('stroke-width="12"', 'stroke-width="10"')
     fonts = WEB.as_uri() + '/fonts/'
     return f'''<!doctype html><html><head><meta charset="utf-8"><style>
     @font-face {{ font-family: C; src: url('{fonts}CG-400.woff2'); }}
@@ -34,21 +31,21 @@ def page():
            font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; display:flex; align-items:center; }}
     .frame {{ position:absolute; inset:28px; border:1.5px solid #a8875a; }}
     .text {{ padding-left:96px; width:600px; position:relative; }}
-    .brand {{ margin-bottom:44px; }}
-    .brand svg {{ display:block; width:132px; height:auto; }}
     h1 {{ font: 400 92px/1 C, serif; margin:0 0 26px; }}
     h1 em {{ color:#8a6c43; }}
     p {{ font: italic 400 34px/1.3 C, serif; margin:0; color:#7a6f63; }}
     .by {{ margin-top:34px; font-size:22px; letter-spacing:.12em; color:#8a6c43; }}
     .mark {{ width:400px; height:400px; margin-left:24px; display:flex; align-items:center; justify-content:center;
             background: radial-gradient(circle at 62% 55%, #fb7a75 0%, #f7968f 45%, #fcc8c1 85%, #fdd8d2 100%); }}
-    .mark svg {{ width:62%; height:auto; }}
+    .mark {{ flex-direction:column; color:#fff; text-align:center; }}
+    .role {{ font-weight:600; font-size:20px; letter-spacing:.42em; text-transform:uppercase; margin-bottom:18px; }}
+    .name {{ font: 400 64px/1.05 C, serif; }}
     </style></head><body><div class="frame"></div>
-    <div class="text"><div class="brand">{logo}</div>
+    <div class="text">
     <h1>Натальная <em>карта</em></h1>
     <p>Характер, деньги, отношения, предназначение&nbsp;- и что из неба заденет именно тебя</p>
     {f'<div class="by">{nick}</div>' if nick else ''}</div>
-    <div class="mark">{white}</div>
+    <div class="mark"><div class="role">астролог</div><div class="name">Валерия<br>Кравченко</div></div>
     </body></html>'''
 
 

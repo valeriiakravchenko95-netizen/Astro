@@ -358,14 +358,14 @@ async function storyImage({ title, big, small, lines, link, nick }) {
   ctx.lineWidth = 2;
   ctx.strokeRect(60, 60, width - 120, height - 120);
 
-  // логотип
-  const logo = new Image();
-  const svg = await (await fetch('logo.svg')).text();
-  logo.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace('currentColor', '#a8875a'))}`;
-  await logo.decode().catch(() => {});
-  ctx.drawImage(logo, width / 2 - 125, 220, 250, 70);
-  ctx.fillStyle = '#1f1a15';
+  // подпись автора
   ctx.textAlign = 'center';
+  ctx.fillStyle = '#8a6c43';
+  ctx.font = '600 26px -apple-system, Helvetica, sans-serif';
+  ctx.fillText('А С Т Р О Л О Г', width / 2, 230);
+  ctx.fillStyle = '#1f1a15';
+  ctx.font = `400 58px ${serif}`;
+  ctx.fillText('Валерия Кравченко', width / 2, 300);
 
   const wrap = (text, font, maxWidth) => {
     ctx.font = font;
@@ -423,7 +423,7 @@ async function storyImage({ title, big, small, lines, link, nick }) {
 async function shareStory(options, holder) {
   const blob = await storyImage(options);
   if (!blob) return;
-  const file = new File([blob], 'lume.png', { type: 'image/png' });
+  const file = new File([blob], 'valeri.png', { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
