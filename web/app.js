@@ -2,9 +2,11 @@
 
 import { Ephemeris } from './astro/ephemeris.js';
 import { computeChart } from './astro/chart.js';
-import { MODERN } from './astro/rulers.js';
+import { MODERN, rulerOf } from './astro/rulers.js';
 import { PLACIDUS, WHOLE_SIGN } from './astro/houses.js';
-import { formatLongitude, SIGN_GLYPHS, separation } from './astro/zodiac.js';
+import {
+  formatLongitude, SIGN_GLYPHS, separation, signIndex,
+} from './astro/zodiac.js';
 import { formatOffset } from './astro/timezone.js';
 import { label, loadCities, search } from './places.js';
 import {
@@ -276,6 +278,39 @@ function skyAt(event) {
     || main.some((other) => separation(other.longitude, body.longitude) <= SKY_CONJUNCTION));
 }
 
+// Колесо для проверки под рилс: дома темы (у «больших денег» - 2, 8 и 10),
+// их управители и планеты в них подсвечены.
+const WHEEL_BODIES = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn',
+  'uranus', 'neptune', 'pluto', 'true_node', 'mean_lilith'];
+
+function renderCheckWheel(chart, check, exactTime) {
+  const node = card('Где это в твоей карте');
+  const houses = exactTime ? check.houses || [] : [];
+  const bodies = new Set();
+  if (houses.length) {
+    const cusps = chart.houses.get(chart.houseSystem).cusps;
+    for (const house of houses) {
+      bodies.add(rulerOf(signIndex(cusps[house - 1]), chart.rulerScheme));
+      for (const key of WHEEL_BODIES) {
+        if (chart.positions.get(key)?.house === house) bodies.add(key);
+      }
+    }
+  }
+  node.append(renderWheel(chart, { exactTime, highlight: { houses, bodies: [...bodies] } }));
+  const legend = element('p', 'sky-legend');
+  if (houses.length) {
+    const names = [...bodies].filter((key) => chart.positions.has(key))
+      .map((key) => chart.positions.get(key).body.name);
+    const about = check.houses_label ? ` (${check.houses_label})` : '';
+    legend.append(element('b', null, `Коралловым - ${houses.join(', ')} дома`),
+      `${about} и то, что ими правит или в них стоит${names.length ? `: ${names.join(', ')}` : ''}.`);
+  } else {
+    legend.append('Без точного времени дома не посчитать, поэтому на колесе только планеты.');
+  }
+  node.append(legend);
+  return node;
+}
+
 function render(chart, exactTime) {
   result.replaceChildren();
 
@@ -289,6 +324,7 @@ function render(chart, exactTime) {
   const check = askedCheck();
   let target = result;
   if (check) {
+    result.append(renderCheckWheel(chart, check, exactTime));
     result.append(renderCheck(chart, check, { dmUrl: siteSettings().dm_url, nick: instagramNick() }));
     const offer = check.code_word ? null : renderOffer('readings');
     if (offer) result.append(offer);
@@ -332,7 +368,8 @@ function render(chart, exactTime) {
       'В этот день стрелки переводили назад, и такой час прошел дважды. '
       + 'Взят первый.'));
   }
-  if (!eventFirst) head.append(renderWheel(chart, { exactTime }));
+  // Колесо уже стоит выше - с событием или с домами проверки.
+  if (!eventFirst && !check) head.append(renderWheel(chart, { exactTime }));
   target.append(head);
 
   const reel = fromReel();

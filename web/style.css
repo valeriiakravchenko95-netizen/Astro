@@ -225,6 +225,7 @@ tr:last-child td { border-bottom: 0; }
 .wheel .aspect.soft { stroke: var(--accent); }
 .wheel .aspect.hard { stroke: var(--text); opacity: .45; }
 .wheel.with-sky { max-width: 480px; }
+.wheel .sector { fill: var(--sky); opacity: .1; stroke: none; }
 .wheel.with-sky .aspect { opacity: .25; }
 .wheel .contact { stroke: var(--sky); stroke-width: 1.4; opacity: .9; }
 .wheel .event-axis { stroke: var(--sky); stroke-width: 1; stroke-dasharray: 3 3; }

@@ -61,7 +61,9 @@ function spread(longitudes, gap = 8) {
   return result;
 }
 
-export function renderWheel(chart, { exactTime, overlay = null }) {
+// highlight - подсветить в карте тему без неба: дома (сектором и началом)
+// и планеты. Так проверка «большие деньги» показывает дома денег.
+export function renderWheel(chart, { exactTime, overlay = null, highlight = null }) {
   const start = exactTime ? chart.angles.asc : 0;
   // Экранный угол градуса эклиптики: слева старт, дальше против часовой.
   const point = (longitude, radius) => {
@@ -102,10 +104,25 @@ export function renderWheel(chart, { exactTime, overlay = null }) {
     .filter((hit) => hit.natalKind === 'angle').map((hit) => hit.natal));
   const touchedCusps = new Set((overlay?.hits || [])
     .filter((hit) => hit.natalKind === 'cusp').map((hit) => hit.house));
+  for (const house of highlight?.houses || []) touchedCusps.add(house);
 
   // Дома: куспиды от кольца знаков к внутреннему кругу, номер посередине.
   if (exactTime) {
     const cusps = chart.houses.get(chart.houseSystem).cusps;
+    // Подсвеченные дома - легкой заливкой сектора между кольцами.
+    for (const house of highlight?.houses || []) {
+      const from = cusps[house - 1];
+      const span = ((((cusps[house % 12] - from) % 360) + 360) % 360);
+      const steps = Math.max(2, Math.ceil(span / 5));
+      const outer = [];
+      const innerArc = [];
+      for (let i = 0; i <= steps; i += 1) {
+        outer.push(point(from + (span * i) / steps, R_SIGN));
+        innerArc.push(point(from + (span * i) / steps, R_INNER));
+      }
+      const pts = [...outer, ...innerArc.reverse()].map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`);
+      svg.append(node('polygon', { points: pts.join(' '), class: 'sector' }));
+    }
     cusps.forEach((cusp, index) => {
       const angle = index === 0 || index === 9;
       const hit = touchedCusps.has(index + 1) ? ' hit' : '';
@@ -137,7 +154,7 @@ export function renderWheel(chart, { exactTime, overlay = null }) {
   svg.append(inner);
 
   // Касания события: линии от его градуса к задетым точкам карты.
-  const touched = new Set();
+  const touched = new Set(highlight?.bodies || []);
   if (overlay) {
     const contacts = node('g');
     for (const hit of overlay.hits) {
