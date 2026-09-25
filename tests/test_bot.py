@@ -29,10 +29,10 @@ from bot.states import ChartDialog  # noqa: E402
 # --- Разбор ввода ----------------------------------------------------------
 
 @pytest.mark.parametrize("text,expected", [
-    ("21.05.1995", date(1995, 5, 21)),
-    ("1995-05-21", date(1995, 5, 21)),
-    ("21/05/1995", date(1995, 5, 21)),
-    ("  21 05 1995 ", date(1995, 5, 21)),
+    ("14.07.1987", date(1987, 7, 14)),
+    ("1987-07-14", date(1987, 7, 14)),
+    ("14/07/1987", date(1987, 7, 14)),
+    ("  14 07 1987 ", date(1987, 7, 14)),
 ])
 def test_parse_date(text, expected):
     assert parse_date(text) == expected
@@ -52,7 +52,7 @@ def test_dates_outside_the_ephemeris_range_are_refused(year):
 
 
 @pytest.mark.parametrize("text,expected", [
-    ("16:10", time(16, 10)), ("16.10", time(16, 10)),
+    ("11:25", time(11, 25)), ("11.25", time(11, 25)),
     ("9:05", time(9, 5)), ("16", time(16, 0)),
 ])
 def test_parse_time(text, expected):
@@ -254,11 +254,11 @@ async def test_dialog_asks_for_each_field_in_turn(state):
     await handlers.on_chart(message, state)
     assert await state.get_state() == ChartDialog.waiting_date
 
-    message = FakeMessage(text="21.05.1995")
+    message = FakeMessage(text="14.07.1987")
     await handlers.on_date(message, state)
     assert await state.get_state() == ChartDialog.waiting_time
 
-    message = FakeMessage(text="16:10")
+    message = FakeMessage(text="11:25")
     await handlers.on_time(message, state)
     assert await state.get_state() == ChartDialog.waiting_place
 
@@ -275,8 +275,8 @@ async def test_bad_input_does_not_advance_the_dialog(state):
 @pytest.mark.asyncio
 async def test_ambiguous_place_offers_a_choice(state):
     await handlers.on_chart(FakeMessage(), state)
-    await handlers.on_date(FakeMessage(text="21.05.1995"), state)
-    await handlers.on_time(FakeMessage(text="16:10"), state)
+    await handlers.on_date(FakeMessage(text="14.07.1987"), state)
+    await handlers.on_time(FakeMessage(text="11:25"), state)
     message = FakeMessage(text="Донецк")
     await handlers.on_place(message, state)
     assert await state.get_state() == ChartDialog.choosing_place
@@ -286,8 +286,8 @@ async def test_ambiguous_place_offers_a_choice(state):
 @pytest.mark.asyncio
 async def test_unknown_place_is_reported(state):
     await handlers.on_chart(FakeMessage(), state)
-    await handlers.on_date(FakeMessage(text="21.05.1995"), state)
-    await handlers.on_time(FakeMessage(text="16:10"), state)
+    await handlers.on_date(FakeMessage(text="14.07.1987"), state)
+    await handlers.on_time(FakeMessage(text="11:25"), state)
     message = FakeMessage(text="нетакогогорода")
     await handlers.on_place(message, state)
     assert texts.PLACE_NOT_FOUND in message.sent
@@ -296,7 +296,7 @@ async def test_unknown_place_is_reported(state):
 
 @pytest.mark.asyncio
 async def test_chart_is_produced_from_coordinates(state):
-    message = await walk_dialog(state, "21.05.1995", "16:10", "48.023, 37.802")
+    message = await walk_dialog(state, "14.07.1987", "11:25", "50.450, 30.523")
     output = "\n".join(message.sent)
     assert "ПОЛОЖЕНИЯ" in output
     assert "Солнце" in output
@@ -306,26 +306,26 @@ async def test_chart_is_produced_from_coordinates(state):
 @pytest.mark.asyncio
 async def test_birth_data_is_erased_after_the_calculation(state):
     """Главное требование: после расчёта дата и место не остаются в памяти."""
-    await walk_dialog(state, "21.05.1995", "16:10", "48.023, 37.802")
+    await walk_dialog(state, "14.07.1987", "11:25", "50.450, 30.523")
     data = await state.get_data()
     assert "date" not in data and "time" not in data and "places" not in data
     assert set(data) <= {"sections", "chart_id"}
     stored = repr(data)
-    assert "1995" not in stored
-    assert "48.02" not in stored and "37.80" not in stored
+    assert "1987" not in stored
+    assert "50.45" not in stored and "30.52" not in stored
 
 
 @pytest.mark.asyncio
 async def test_chart_identifier_is_kept_for_the_session(state):
-    await walk_dialog(state, "21.05.1995", "16:10", "48.023, 37.802")
+    await walk_dialog(state, "14.07.1987", "11:25", "50.450, 30.523")
     data = await state.get_data()
     assert len(data["chart_id"]) == 64  # SHA-256 в шестнадцатеричном виде
 
 
 @pytest.mark.asyncio
 async def test_unknown_time_hides_houses_and_warns(state):
-    message = await walk_dialog(state, "21.05.1995", texts.UNKNOWN_TIME_BUTTON,
-                                "48.023, 37.802")
+    message = await walk_dialog(state, "14.07.1987", texts.UNKNOWN_TIME_BUTTON,
+                                "50.450, 30.523")
     output = "\n".join(message.sent)
     assert "Время рождения неизвестно" in output
     data = await state.get_data()
@@ -334,7 +334,7 @@ async def test_unknown_time_hides_houses_and_warns(state):
 
 @pytest.mark.asyncio
 async def test_known_time_keeps_houses(state):
-    await walk_dialog(state, "21.05.1995", "16:10", "48.023, 37.802")
+    await walk_dialog(state, "14.07.1987", "11:25", "50.450, 30.523")
     data = await state.get_data()
     assert "houses" in data["sections"]
     assert "ASC" in data["sections"]["houses"]
@@ -342,7 +342,7 @@ async def test_known_time_keeps_houses(state):
 
 @pytest.mark.asyncio
 async def test_sections_can_be_requested_afterwards(state):
-    await walk_dialog(state, "21.05.1995", "16:10", "48.023, 37.802")
+    await walk_dialog(state, "14.07.1987", "11:25", "50.450, 30.523")
     message = FakeMessage()
     await handlers.on_section(FakeCallback("section:aspects", message), state)
     assert any("АСПЕКТЫ" in text for text in message.sent)
@@ -358,7 +358,7 @@ async def test_section_request_without_a_chart_says_so(state):
 @pytest.mark.asyncio
 async def test_cancel_clears_everything(state):
     await handlers.on_chart(FakeMessage(), state)
-    await handlers.on_date(FakeMessage(text="21.05.1995"), state)
+    await handlers.on_date(FakeMessage(text="14.07.1987"), state)
     message = FakeMessage()
     await handlers.on_cancel(message, state)
     assert await state.get_state() is None
@@ -369,8 +369,8 @@ async def test_cancel_clears_everything(state):
 @pytest.mark.asyncio
 async def test_choosing_a_place_produces_the_chart(state):
     await handlers.on_chart(FakeMessage(), state)
-    await handlers.on_date(FakeMessage(text="21.05.1995"), state)
-    await handlers.on_time(FakeMessage(text="16:10"), state)
+    await handlers.on_date(FakeMessage(text="14.07.1987"), state)
+    await handlers.on_time(FakeMessage(text="11:25"), state)
     await handlers.on_place(FakeMessage(text="Донецк"), state)
 
     message = FakeMessage()
@@ -382,7 +382,7 @@ async def test_choosing_a_place_produces_the_chart(state):
 
 @pytest.mark.asyncio
 async def test_only_available_sections_get_buttons(state):
-    await walk_dialog(state, "21.05.1995", texts.UNKNOWN_TIME_BUTTON, "48.023, 37.802")
+    await walk_dialog(state, "14.07.1987", texts.UNKNOWN_TIME_BUTTON, "50.450, 30.523")
     data = await state.get_data()
     markup = keyboards.sections(list(data["sections"]))
     offered = {

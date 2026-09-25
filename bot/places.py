@@ -124,7 +124,7 @@ def search(query: str, limit: int = MAX_SUGGESTIONS) -> List[Place]:
 
 
 def parse_coordinates(text: str) -> Optional[Tuple[float, float]]:
-    """Разбирает координаты, введённые вручную: «48.02, 37.80»."""
+    """Разбирает координаты, введённые вручную: «50.45, 30.52»."""
     cleaned = text.replace(";", " ").replace(",", " ").strip()
     parts = cleaned.split()
     if len(parts) != 2:
