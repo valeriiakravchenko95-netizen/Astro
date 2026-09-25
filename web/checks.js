@@ -56,7 +56,8 @@ export function flattenCheckTexts(full) {
 
 // Что из проверки можно отдать странице заранее: условия, заголовки,
 // кодовое слово. Тексты - только с сервера.
-const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share'];
+const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
+  'heading', 'heading_em', 'lead'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({

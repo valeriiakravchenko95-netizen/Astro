@@ -21,6 +21,7 @@
   --accent-ink: #8a6c43;
   --accent-soft: #ece2d0;
   --danger: #8c3a2e;
+  --sky: #d9534f;
   --serif: 'LumeAstro', 'Cormorant', 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   --sans: 'LumeAstro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   --radius: 2px;
@@ -38,6 +39,7 @@
     --accent-ink: #d8bb8c;
     --accent-soft: #2a231b;
     --danger: #d98b7d;
+    --sky: #f08a83;
   }
 }
 
@@ -211,7 +213,7 @@ tr:last-child td { border-bottom: 0; }
 .wheel .cusp { stroke: var(--line); stroke-width: .8; }
 .wheel .axis { stroke: var(--accent); stroke-width: 1.2; }
 .wheel .mark { stroke: var(--muted); stroke-width: .8; }
-.wheel text { text-anchor: middle; dominant-baseline: central; font-family: 'Segoe UI Symbol', 'Noto Sans Symbols', 'Noto Sans Symbols 2', 'Apple Symbols', 'DejaVu Sans', sans-serif; }
+.wheel text { text-anchor: middle; dominant-baseline: central; font-family: 'LumeAstro', 'Segoe UI Symbol', 'Noto Sans Symbols', 'Noto Sans Symbols 2', 'Apple Symbols', 'DejaVu Sans', sans-serif; }
 .wheel .sign { font-size: 15px; fill: var(--accent-ink); }
 .wheel .planet { font-size: 16px; fill: var(--text); }
 .wheel .planet.retro { fill: var(--muted); }
@@ -220,6 +222,15 @@ tr:last-child td { border-bottom: 0; }
 .wheel .aspect { stroke-width: .7; opacity: .8; }
 .wheel .aspect.soft { stroke: var(--accent); }
 .wheel .aspect.hard { stroke: var(--text); opacity: .45; }
+.wheel.with-sky { max-width: 480px; }
+.wheel.with-sky .aspect { opacity: .25; }
+.wheel .contact { stroke: var(--sky); stroke-width: 1.4; opacity: .9; }
+.wheel .event-axis { stroke: var(--sky); stroke-width: 1; stroke-dasharray: 3 3; }
+.wheel .sky-mark { stroke: var(--sky); stroke-width: 1.2; }
+.wheel .sky-planet { font-size: 18px; fill: var(--sky); }
+.wheel .planet.hit { fill: var(--sky); }
+.sky-legend { font-size: 13px; color: var(--muted); text-align: center; margin: 6px 0 0; }
+.sky-legend b { color: var(--sky); font-weight: 600; }
 
 /* --- что из ближайшего заденет тебя --- */
 
@@ -316,3 +327,10 @@ footer .sign svg { width: 52px; height: auto; color: var(--accent); }
   display: inline-block; margin-top: 8px; padding: 15px 26px; background: var(--text); color: var(--bg);
   text-decoration: none; font: 600 12px/1 var(--sans); letter-spacing: .2em; text-transform: uppercase;
 }
+
+/* заголовок под ссылку из рилса: длиннее обычного */
+header.landing h1 { font-size: 40px; }
+.more-events { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
+.card.compact { padding-top: 16px; padding-bottom: 16px; }
+.card.compact > .note { margin: 0; }
+.card.compact > .warn { margin: 10px 0 0; }

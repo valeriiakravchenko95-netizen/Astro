@@ -3,6 +3,7 @@
 import { allEvents, examine, eventsAround, findEvent } from './astro/transits.js';
 import { formatLongitude } from './astro/zodiac.js';
 import { textNodes } from './text.js';
+import { renderWheel } from './wheel.js';
 
 let content = {
   events: {}, contacts: {}, points: {}, forms: {}, houses: {}, house_details: {}, featured: null,
@@ -40,12 +41,32 @@ export function addSkyTexts(texts) {
 
 // Событие, о котором пришли спросить: ?event=ключ@дата или короткая ссылка
 // под рилс вроде /polnolunie (раздел links в transits.json).
+function askedLink() {
+  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, '').toLowerCase();
+  return path ? content.links?.[path] || null : null;
+}
+
 export function askedEvent() {
   const byQuery = findEvent(new URLSearchParams(location.search).get('event'));
   if (byQuery) return byQuery;
-  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, '').toLowerCase();
-  const link = path ? content.links?.[path] : null;
+  const link = askedLink();
   return link ? findEvent(link.event) : null;
+}
+
+// Заголовок страницы, когда пришли по ссылке на событие: вместо «Натальная
+// карта» - само событие.
+export function eventHeading() {
+  const event = askedEvent();
+  if (!event) return null;
+  const link = new URLSearchParams(location.search).get('event') ? null : askedLink();
+  const date = event.date.split('-').reverse().slice(0, 2).join('.');
+  return {
+    main: link?.heading || event.title,
+    accent: link?.heading_em ?? date,
+    lead: link?.lead || 'Проверь по своей натальной карте, заденет ли это тебя и в какой сфере жизни. '
+      + 'Расчет идет в твоем браузере: дата и место рождения никуда не отправляются.',
+    title: link?.title || `${event.title} ${date}`,
+  };
 }
 
 // Текст события. Для конкретного дня может быть свой, под ключом с датой
@@ -144,13 +165,16 @@ function nameOf(chart, hit) {
   return chart.positions.get(hit.natal)?.body.name || hit.natal;
 }
 
-export function renderTransits(chart, { exactTime }) {
+// focus - страница открыта по ссылке на событие: сначала колесо с этим
+// событием поверх карты и его разбор, календарь остальных событий в конце.
+// skyAt(event) дает планеты неба на момент события для внешнего кольца.
+export function renderTransits(chart, { exactTime, focus = false, skyAt = null }) {
   const events = eventsAround();
   const chosen = chooseEvent(events);
   if (!chosen) return null;
 
   const node = element('section', 'card');
-  node.append(element('h2', null, 'Сейчас в небе'));
+  node.append(element('h2', null, focus ? 'Как это ложится на твою карту' : 'Сейчас в небе'));
 
   const chooser = element('div', 'topics');
   const body = element('div');
@@ -161,6 +185,20 @@ export function renderTransits(chart, { exactTime }) {
     }
     body.replaceChildren();
 
+    const report = examine(chart, event.longitude, event.title);
+
+    if (focus && skyAt) {
+      body.append(renderWheel(chart, {
+        exactTime,
+        overlay: { point: event.longitude, hits: report.hits, bodies: skyAt(event) },
+      }));
+      const legend = element('p', 'sky-legend');
+      legend.append('Внутри - твоя карта. ');
+      legend.append(element('b', null, 'Снаружи и цветом'));
+      legend.append(' - небо в день события и задетые точки.');
+      body.append(legend);
+    }
+
     const heading = element('h3', null, event.title);
     const when = element('p', 'where',
       `${event.date.split('-').reverse().join('.')} · ${formatLongitude(event.longitude)}`
@@ -169,8 +207,6 @@ export function renderTransits(chart, { exactTime }) {
 
     const about = eventText(event);
     if (about) body.append(...textNodes(about));
-
-    const report = examine(chart, event.longitude, event.title);
 
     if (!report.touches) {
       body.append(element('p', 'note',
@@ -249,7 +285,12 @@ export function renderTransits(chart, { exactTime }) {
   };
   for (const event of events) addButton(event);
 
-  node.append(chooser, body);
+  if (focus) {
+    const more = element('h3', 'more-events', 'Другие события неба');
+    node.append(body, more, chooser);
+  } else {
+    node.append(chooser, body);
+  }
   show(chosen);
 
   // Открыть любое событие календаря, даже если его нет среди кнопок рядом с

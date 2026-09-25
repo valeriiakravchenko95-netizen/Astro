@@ -4,6 +4,9 @@
 // слева, как принято: круг поворачивается так, чтобы восходящий градус
 // оказался на девяти часах, а зодиак шел против часовой стрелки. Если
 // время рождения неизвестно, домов и углов нет, и слева ставится 0° Овна.
+//
+// Для события неба поверх натала рисуется внешнее кольцо: планеты в день
+// события, линии от градуса события к задетым точкам карты.
 
 import { SIGN_GLYPHS } from './astro/zodiac.js';
 
@@ -58,7 +61,7 @@ function spread(longitudes, gap = 8) {
   return result;
 }
 
-export function renderWheel(chart, { exactTime }) {
+export function renderWheel(chart, { exactTime, overlay = null }) {
   const start = exactTime ? chart.angles.asc : 0;
   // Экранный угол градуса эклиптики: слева старт, дальше против часовой.
   const point = (longitude, radius) => {
@@ -73,9 +76,12 @@ export function renderWheel(chart, { exactTime }) {
     });
   };
 
+  // Внешнему кольцу события нужно место за кругом знаков.
+  const pad = overlay ? 34 : 0;
   const svg = node('svg', {
-    viewBox: `0 0 ${SIZE} ${SIZE}`, class: 'wheel', role: 'img',
-    'aria-label': 'Колесо натальной карты',
+    viewBox: `${-pad} ${-pad} ${SIZE + 2 * pad} ${SIZE + 2 * pad}`,
+    class: overlay ? 'wheel with-sky' : 'wheel', role: 'img',
+    'aria-label': overlay ? 'Событие неба поверх натальной карты' : 'Колесо натальной карты',
   });
 
   svg.append(node('circle', { cx: C, cy: C, r: R_OUT, class: 'ring' }));
@@ -122,6 +128,21 @@ export function renderWheel(chart, { exactTime }) {
   }
   svg.append(inner);
 
+  // Касания события: линии от его градуса к задетым точкам карты.
+  const touched = new Set();
+  if (overlay) {
+    const contacts = node('g');
+    for (const hit of overlay.hits) {
+      let target = null;
+      if (hit.natalKind === 'body' && shown.includes(hit.natal)) target = chart.positions.get(hit.natal).longitude;
+      else if (hit.natalKind === 'angle' && exactTime) target = chart.angles[hit.natal];
+      if (target === null) continue;
+      touched.add(hit.natal);
+      contacts.append(line(overlay.point, R_INNER, target, R_INNER, 'contact'));
+    }
+    svg.append(contacts);
+  }
+
   // Планеты: черточка на настоящем градусе и значок на разведенном месте.
   const longitudes = shown.map((key) => chart.positions.get(key).longitude);
   const places = spread(longitudes);
@@ -132,11 +153,27 @@ export function renderWheel(chart, { exactTime }) {
     const [x, y] = point(places[index], R_PLANET);
     const glyph = node('text', {
       x: x.toFixed(1), y: y.toFixed(1),
-      class: `planet${position.retrograde ? ' retro' : ''}`,
+      class: `planet${position.retrograde ? ' retro' : ''}${touched.has(key) ? ' hit' : ''}`,
     }, position.body.glyph + TEXT);
     glyph.append(node('title', {}, position.body.name));
     svg.append(glyph);
   });
+
+  if (overlay) {
+    // Градус события - сквозная черта через все кольца.
+    svg.append(line(overlay.point, R_INNER, overlay.point, R_OUT + 4, 'event-axis'));
+    const R_SKY = R_OUT + 18;
+    const places = spread(overlay.bodies.map((body) => body.longitude), 10);
+    overlay.bodies.forEach((body, index) => {
+      svg.append(line(body.longitude, R_OUT, body.longitude, R_OUT + 6, 'sky-mark'));
+      const [x, y] = point(places[index], R_SKY);
+      const glyph = node('text', {
+        x: x.toFixed(1), y: y.toFixed(1), class: 'sky-planet',
+      }, body.glyph + TEXT);
+      glyph.append(node('title', {}, `${body.name} в небе`));
+      svg.append(glyph);
+    });
+  }
 
   return svg;
 }

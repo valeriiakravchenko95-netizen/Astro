@@ -52,6 +52,12 @@ export function childTopics() {
   return content.child_topics || [];
 }
 
+// Тема из ссылки ?topic=money - для заголовка страницы.
+export function askedTopic() {
+  const asked = new URLSearchParams(location.search).get('topic');
+  return asked ? (content.topics || []).find((topic) => topic.key === asked) || null : null;
+}
+
 export function neededTexts(chart, exactTime, topics = content.topics || []) {
   const wanted = [];
   for (const topic of topics) {

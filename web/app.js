@@ -4,17 +4,19 @@ import { Ephemeris } from './astro/ephemeris.js';
 import { computeChart } from './astro/chart.js';
 import { MODERN } from './astro/rulers.js';
 import { PLACIDUS, WHOLE_SIGN } from './astro/houses.js';
-import { formatLongitude, SIGN_GLYPHS } from './astro/zodiac.js';
+import { formatLongitude, SIGN_GLYPHS, separation } from './astro/zodiac.js';
 import { formatOffset } from './astro/timezone.js';
 import { label, loadCities, search } from './places.js';
 import {
   renderReadings, loadInterpretations, neededTexts, addTexts, setOpenCards, childTopics,
+  askedTopic,
 } from './readings.js';
 import {
   renderTransits, renderUpcoming, loadTransitTexts, neededSkyTexts, addSkyTexts,
-  askedEvent,
+  askedEvent, eventHeading,
 } from './transit-view.js';
 import { renderWheel } from './wheel.js';
+import { BY_KEY } from './astro/bodies.js';
 import {
   loadSite, renderAuthor, renderOffer, siteSettings, instagramNick,
 } from './site.js';
@@ -46,6 +48,49 @@ function setStatus(text, isError = false) {
   status.classList.toggle('error', isError);
 }
 
+// Пришли по ссылке из рилса - заголовок страницы про то, ради чего пришли:
+// проверка, событие неба или тема, а не просто «Натальная карта».
+function landingHeading() {
+  const check = askedCheck();
+  if (check) {
+    return {
+      main: check.heading || check.title,
+      accent: check.heading_em ?? 'в твоей карте',
+      lead: check.lead || 'Проверь по своей натальной карте, сколько показателей у тебя есть и что с ними делать.',
+      title: check.share || check.title,
+    };
+  }
+  const event = eventHeading();
+  if (event) return event;
+  const topic = askedTopic();
+  if (topic) {
+    return {
+      main: topic.heading || topic.name,
+      accent: topic.heading_em ?? 'в твоей карте',
+      lead: topic.lead || 'Разбор по натальной карте. Расчет идет в твоем браузере: '
+        + 'дата и место рождения никуда не отправляются.',
+      title: topic.name,
+    };
+  }
+  return null;
+}
+
+// Короткие слова («с», «в», «на») не остаются в конце строки заголовка.
+const glue = (text) => String(text).replace(/(^|\s)([а-яa-z]{1,2})\s/giu, '$1$2\u00a0');
+
+function applyLanding() {
+  const heading = landingHeading();
+  if (!heading) return;
+  const header = document.querySelector('header');
+  const h1 = header.querySelector('h1');
+  h1.replaceChildren(glue(heading.main));
+  if (heading.accent) h1.append(' ', element('em', null, glue(heading.accent)));
+  const lead = header.querySelector('h1 + p');
+  if (lead) lead.textContent = heading.lead;
+  header.classList.add('landing');
+  document.title = `${heading.title} · Lume`;
+}
+
 async function boot() {
   try {
     const [loaded] = await Promise.all([
@@ -62,6 +107,7 @@ async function boot() {
       loadChecks(),
     ]);
     ephemeris = loaded;
+    applyLanding();
     submit.disabled = false;
     submit.textContent = 'Построить карту';
     setStatus('');
@@ -206,6 +252,24 @@ function card(title) {
   return node;
 }
 
+// Планеты неба в момент события - для внешнего кольца колеса. Берутся тела
+// самого события и те, что стоят с ними в одном градусе (для полнолуния
+// 26.09.2026 это Нептун рядом с Луной).
+const SKY_KEYS = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'];
+const SKY_CONJUNCTION = 3;
+
+function skyAt(event) {
+  if (!ephemeris || !event.jd) return [];
+  const jdTt = event.jd + 69 / 86400; // разница шкал времени, около минуты
+  if (ephemeris.covers && !ephemeris.covers(jdTt)) return [];
+  const all = SKY_KEYS.filter((key) => ephemeris.has(key)).map((key) => ({
+    key, ...BY_KEY.get(key), longitude: ephemeris.position(key, jdTt).longitude,
+  }));
+  const main = all.filter((body) => (event.bodies || []).includes(body.key));
+  return all.filter((body) => main.includes(body)
+    || main.some((other) => separation(other.longitude, body.longitude) <= SKY_CONJUNCTION));
+}
+
 function render(chart, exactTime) {
   result.replaceChildren();
 
@@ -234,10 +298,15 @@ function render(chart, exactTime) {
     result.append(more, target);
   }
 
+  // Пришли по ссылке на событие неба (рилс про полнолуние): первым идет
+  // колесо с этим событием поверх карты, его разбор, потом календарь.
+  const eventFirst = Boolean(!check && askedEvent());
+
   const { name } = label(chosenPlace);
   const local = chart.moment;
   const head = card();
-  head.append(element('h2', null, 'Твоя карта'));
+  if (eventFirst) head.classList.add('compact');
+  else head.append(element('h2', null, 'Твоя карта'));
   head.append(element('p', 'note',
     `${name} · ${dateInput.value.split('-').reverse().join('.')}`
     + (exactTime ? ` ${timeInput.value}` : '')
@@ -257,33 +326,35 @@ function render(chart, exactTime) {
       'В этот день стрелки переводили назад, и такой час прошел дважды. '
       + 'Взят первый.'));
   }
-  head.append(renderWheel(chart, { exactTime }));
+  if (!eventFirst) head.append(renderWheel(chart, { exactTime }));
   target.append(head);
 
-  // Сначала то, ради чего человек пришел: разбор по теме. Небо и цифры ниже.
-  // Если пришли по ссылке на событие неба (рилс про полнолуние), первым идет
-  // оно.
-  const transits = renderTransits(chart, { exactTime });
-  const eventFirst = Boolean(transits && !check && askedEvent());
-  if (eventFirst) target.append(transits);
+  const transits = renderTransits(chart, { exactTime, focus: eventFirst, skyAt });
+  const upcoming = transits ? renderUpcoming(chart, {
+    exactTime,
+    onPick: (event) => {
+      transits.showEvent(event);
+      transits.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+  }) : null;
+  const skyOffer = renderOffer('sky');
 
+  if (eventFirst) {
+    target.append(transits);
+    if (skyOffer) target.append(skyOffer);
+    target.append(upcoming);
+  }
+
+  // Сначала то, ради чего человек пришел: разбор по теме. Небо и цифры ниже.
   const readings = renderReadings(chart, { exactTime });
   if (readings) target.append(readings);
   const readingsOffer = check ? null : renderOffer('readings');
   if (readingsOffer) target.append(readingsOffer);
 
-  if (transits) {
-    target.append(renderUpcoming(chart, {
-      exactTime,
-      onPick: (event) => {
-        transits.showEvent(event);
-        transits.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      },
-    }));
-    if (!eventFirst) target.append(transits);
+  if (!eventFirst) {
+    if (transits) target.append(upcoming, transits);
+    if (skyOffer) target.append(skyOffer);
   }
-  const skyOffer = renderOffer('sky');
-  if (skyOffer) target.append(skyOffer);
 
   // Градусы, дома и аспекты нужны тем, кто хочет проверить; остальным они
   // только мешают дойти до текста, поэтому свернуты.
