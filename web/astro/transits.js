@@ -122,6 +122,51 @@ export function examine(chart, longitude, transitName = 'транзит', option
 // Загрузка календаря событий.
 let calendar = null;
 
+// Событие неба целиком. Полнолуние работает по оси: Луна с одной стороны,
+// Солнце с другой, и у каждой стороны свой дом и свои касания. Поэтому для
+// полнолуния градус проверяется дважды, а касание к точке карты берется
+// от того светила, с которым оно сильнее (соединение с Солнцем важнее
+// оппозиции к Луне, хотя это один и тот же градус). У каждого касания
+// помечено светило (luminary) и градус, от которого оно идет (source).
+const ASPECT_ORDER = ['conjunction', 'opposition', 'square', 'trine', 'sextile'];
+
+export function isFullMoon(event) {
+  return event?.kind === 'lunation' && event.detail?.phase === 'full';
+}
+
+export function examineEvent(chart, event) {
+  const moon = examine(chart, event.longitude, event.title);
+  if (!isFullMoon(event)) return moon;
+  const sunLongitude = (event.longitude + 180) % 360;
+  const sun = examine(chart, sunLongitude, event.title);
+  const byPoint = new Map();
+  const keyOf = (hit) => (hit.natalKind === 'cusp' ? `cusp ${hit.house}` : hit.natal);
+  for (const hit of moon.hits) {
+    byPoint.set(keyOf(hit), { ...hit, luminary: 'moon', source: event.longitude });
+  }
+  for (const hit of sun.hits) {
+    const candidate = { ...hit, luminary: 'sun', source: sunLongitude };
+    const previous = byPoint.get(keyOf(hit));
+    if (!previous
+      || ASPECT_ORDER.indexOf(candidate.aspect.key) < ASPECT_ORDER.indexOf(previous.aspect.key)) {
+      byPoint.set(keyOf(hit), candidate);
+    }
+  }
+  const hits = [...byPoint.values()].sort((a, b) => a.orb - b.orb);
+  const housesTouched = [...new Set([...moon.housesTouched, ...sun.housesTouched])].sort((a, b) => a - b);
+  return {
+    longitude: event.longitude,
+    sunLongitude,
+    axis: true,
+    hits,
+    house: moon.house,
+    sunHouse: sun.house,
+    housesTouched,
+    ruledHouses: moon.ruledHouses,
+    get touches() { return hits.length > 0 || moon.house !== null; },
+  };
+}
+
 export async function loadEvents(url = 'data/events.json') {
   if (calendar) return calendar;
   try {

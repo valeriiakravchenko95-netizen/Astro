@@ -146,7 +146,8 @@ export function renderWheel(chart, { exactTime, overlay = null }) {
       else if (hit.natalKind === 'angle' && exactTime) target = chart.angles[hit.natal];
       if (target === null) continue;
       touched.add(hit.natal);
-      contacts.append(line(overlay.point, R_INNER, target, R_INNER, 'contact'));
+      // От того светила, с которым касание (у полнолуния их два).
+      contacts.append(line(hit.source ?? overlay.point, R_INNER, target, R_INNER, 'contact'));
     }
     svg.append(contacts);
   }
@@ -168,8 +169,11 @@ export function renderWheel(chart, { exactTime, overlay = null }) {
   });
 
   if (overlay) {
-    // Градус события - сквозная черта через все кольца.
-    svg.append(line(overlay.point, R_INNER, overlay.point, R_OUT + 4, 'event-axis'));
+    // Градус события - сквозная черта через все кольца (у полнолуния - оба
+    // конца оси).
+    for (const at of overlay.points || [overlay.point]) {
+      svg.append(line(at, R_INNER, at, R_OUT + 4, 'event-axis'));
+    }
     const R_SKY = R_OUT + 18;
     const places = spread(overlay.bodies.map((body) => body.longitude), 10);
     overlay.bodies.forEach((body, index) => {

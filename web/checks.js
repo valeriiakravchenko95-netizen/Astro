@@ -9,7 +9,7 @@
 import { SIGNS_IN, norm180, signIndex } from './astro/zodiac.js';
 import { rulerOf, TRADITIONAL } from './astro/rulers.js';
 import { textNodes, inGender } from './text.js';
-import { allEvents, examine } from './astro/transits.js';
+import { allEvents, examineEvent } from './astro/transits.js';
 
 let definitions = [];
 let texts = {};
@@ -325,7 +325,7 @@ export function topicPeriods(chart, houses, { days = 365, today = new Date(), ma
   for (const event of allEvents()) {
     if (event.date < from || event.date > to) continue;
     const limit = event.kind === 'lunation' ? 1 : 1.5;
-    const report = examine(chart, event.longitude, event.title);
+    const report = examineEvent(chart, event);
     const personal = report.hits.some((hit) => PERSONAL.includes(hit.natal) && hit.orb <= limit);
     if (!personal || !report.housesTouched.some((house) => houses.includes(house))) continue;
     const [year, month] = event.date.split('-').map(Number);

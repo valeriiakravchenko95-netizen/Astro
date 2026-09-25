@@ -1,7 +1,7 @@
 // Раздел «Сейчас в небе»: событие и то, как оно задевает карту.
 
 import {
-  allEvents, examine, eventsAround, findEvent, ruledHouses,
+  allEvents, examineEvent, eventsAround, findEvent, ruledHouses, isFullMoon,
 } from './astro/transits.js';
 import { formatLongitude } from './astro/zodiac.js';
 import { textNodes } from './text.js';
@@ -92,11 +92,12 @@ export function neededSkyTexts(chart, exactTime) {
     wanted.push(['events', `${event.key}@${event.date}`]);
     for (const form of ['conjunction', 'opposition', 'square', 'trine', 'sextile']) {
       wanted.push(['forms', `${form}@${event.key}@${event.date}`]);
+      wanted.push(['forms', `${form}.sun@${event.key}@${event.date}`]);
     }
   }
   for (const event of events.values()) {
     wanted.push(['events', event.key]);
-    for (const hit of examine(chart, event.longitude, event.title).hits) {
+    for (const hit of examineEvent(chart, event).hits) {
       if (hit.natalKind === 'cusp') {
         wanted.push(['contacts', `cusp.${hit.house}`]);
       } else {
@@ -162,9 +163,40 @@ function contactText(hit, event) {
   const exact = content.contacts?.[`${hit.aspect.key}.${hit.natal}`];
   if (exact) return exact;
   const point = content.points?.[hit.natal];
-  const form = (event && content.forms?.[`${hit.aspect.key}@${event.key}@${event.date}`])
+  const form = (event && hit.luminary
+      && content.forms?.[`${hit.aspect.key}.${hit.luminary}@${event.key}@${event.date}`])
+    || (event && content.forms?.[`${hit.aspect.key}@${event.key}@${event.date}`])
     || content.forms?.[hit.aspect.key];
   return point && form ? `${point}\n\n${form}` : '';
+}
+
+const LUMINARY = { moon: 'Луной', sun: 'Солнцем' };
+const LUMINARY_SHORT = { moon: 'Луна', sun: 'Солнце' };
+
+// Как назвать касание. У полнолуния - еще и от какого светила оно идет:
+// «соединение с Солнцем», «начало 10 дома (Солнце)».
+function aspectLabel(hit) {
+  const name = hit.aspect.name.toLowerCase();
+  if (!hit.luminary) return name;
+  // Квадрат к одному концу оси - это квадрат и к другому.
+  if (hit.aspect.key === 'square') return 'квадрат к оси полнолуния';
+  return `${name} с ${LUMINARY[hit.luminary]}`;
+}
+
+function touchLabel(chart, hit) {
+  if (hit.natalKind === 'cusp') {
+    return hit.luminary ? `${nameOf(chart, hit)} (${LUMINARY_SHORT[hit.luminary]})` : nameOf(chart, hit);
+  }
+  return `${nameOf(chart, hit)} (${aspectLabel(hit)})`;
+}
+
+// Где проходит событие: у полнолуния это ось двух домов.
+function whereLabel(report) {
+  if (report.axis && report.sunHouse && report.sunHouse !== report.house) {
+    return `полнолуние идет по оси ${report.house} и ${report.sunHouse} домов: `
+      + `Луна в ${report.house} доме, Солнце в ${report.sunHouse}`;
+  }
+  return `градус приходится на ${report.house} дом`;
 }
 
 function nameOf(chart, hit) {
@@ -211,12 +243,17 @@ export function renderTransits(chart, { exactTime, focus = false, skyAt = null }
     }
     body.replaceChildren();
 
-    const report = examine(chart, event.longitude, event.title);
+    const report = examineEvent(chart, event);
 
     if (focus && skyAt) {
       body.append(renderWheel(chart, {
         exactTime,
-        overlay: { point: event.longitude, hits: report.hits, bodies: skyAt(event) },
+        overlay: {
+          point: event.longitude,
+          points: report.axis ? [event.longitude, report.sunLongitude] : [event.longitude],
+          hits: report.hits,
+          bodies: skyAt(event),
+        },
       }));
       body.append(skyLegend(skyAt(event), report));
     }
@@ -240,11 +277,13 @@ export function renderTransits(chart, { exactTime, focus = false, skyAt = null }
     const verdict = element('div', 'warn');
     if (report.hits.length) {
       const parts = [`Задевает ${plural(report.hits.length, 'точку', 'точки', 'точек')} карты`];
-      if (report.house) parts.push(`градус приходится на ${report.house} дом`);
+      if (report.house) parts.push(whereLabel(report));
       verdict.textContent = parts.join(', ') + '.';
     } else {
+      const where = whereLabel(report);
       verdict.textContent = `Лично тебя не задевает: ни одна точка карты не попадает в орбис. `
-        + `Градус приходится на ${report.house} дом - в этой сфере событие пройдет фоном.`;
+        + `${where[0].toUpperCase()}${where.slice(1)} - в ${report.axis ? 'этих сферах' : 'этой сфере'} `
+        + 'событие пройдет фоном.';
     }
     body.append(verdict);
 
@@ -252,7 +291,8 @@ export function renderTransits(chart, { exactTime, focus = false, skyAt = null }
     for (const hit of report.hits) {
       const row = element('tr');
       row.append(element('td', 'name', nameOf(chart, hit)));
-      row.append(element('td', 'note', hit.aspect.name.toLowerCase()));
+      row.append(element('td', 'note', hit.natalKind === 'cusp' && hit.luminary
+        ? LUMINARY_SHORT[hit.luminary] : aspectLabel(hit)));
       row.append(element('td', 'deg', `${hit.orb.toFixed(1)}°`));
       row.append(element('td', 'mark', hit.exact ? '!' : ''));
       table.append(row);
@@ -269,8 +309,8 @@ export function renderTransits(chart, { exactTime, focus = false, skyAt = null }
       if (!written) continue;
       const item = element('div', 'reading');
       item.append(element('h3', null, hit.natalKind === 'cusp'
-        ? `Касается: ${nameOf(chart, hit)}`
-        : `Касается: ${nameOf(chart, hit)}, ${hit.aspect.name.toLowerCase()}`));
+        ? `Касается: ${touchLabel(chart, hit)}`
+        : `Касается: ${nameOf(chart, hit)}, ${aspectLabel(hit)}`));
       item.append(...textNodes(written));
       body.append(item);
     }
@@ -341,7 +381,7 @@ export function personalEvents(chart, { exactTime, days = 183, today = new Date(
   const found = [];
   for (const event of allEvents()) {
     if (event.date < from || event.date > to) continue;
-    const report = examine(chart, event.longitude, event.title);
+    const report = examineEvent(chart, event);
     const limit = LIMIT[event.kind] ?? LIMIT.default;
     // Личные точки и начала домов (дома - только при точном времени).
     const hits = report.hits.filter((hit) => (PERSONAL.includes(hit.natal) || hit.natalKind === 'cusp')
@@ -428,9 +468,7 @@ export function renderUpcoming(chart, { exactTime, onPick = null, exclude = new 
     }
     row.append(element('span', 'date', event.date.split('-').reverse().join('.')));
     row.append(element('span', 'what', event.title));
-    row.append(element('span', 'touch', 'касается: ' + hits.map((hit) => (hit.natalKind === 'cusp'
-      ? nameOf(chart, hit)
-      : `${nameOf(chart, hit)} (${hit.aspect.name.toLowerCase()})`)).join(', ')));
+    row.append(element('span', 'touch', `касается: ${hits.map((hit) => touchLabel(chart, hit)).join(', ')}`));
     const themes = themesOf(chart, hits, exactTime);
     if (themes.length) row.append(element('span', 'themes-line', `темы: ${themes.join(', ')}`));
     item.append(row);
