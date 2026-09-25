@@ -1,6 +1,8 @@
 // Раздел «Сейчас в небе»: событие и то, как оно задевает карту.
 
-import { allEvents, examine, eventsAround, findEvent } from './astro/transits.js';
+import {
+  allEvents, examine, eventsAround, findEvent, ruledHouses,
+} from './astro/transits.js';
 import { formatLongitude } from './astro/zodiac.js';
 import { textNodes } from './text.js';
 import { renderWheel } from './wheel.js';
@@ -104,7 +106,7 @@ export function neededSkyTexts(chart, exactTime) {
   }
   for (const form of ['conjunction', 'opposition', 'square', 'trine', 'sextile']) wanted.push(['forms', form]);
   for (let house = 1; house <= 12; house += 1) {
-    wanted.push(['houses', String(house)], ['house_details', String(house)]);
+    wanted.push(['houses', String(house)], ['house_details', String(house)], ['house_short', String(house)]);
   }
   const unique = new Map(wanted.map((pair) => [pair.join('\u0000'), pair]));
   return [...unique.values()];
@@ -306,8 +308,8 @@ export function renderTransits(chart, { exactTime, focus = false, skyAt = null }
   for (const event of events) addButton(event);
 
   if (focus) {
-    const more = element('h3', 'more-events', 'Другие события неба');
-    node.append(body, more, chooser);
+    // Календарь остальных событий идет отдельными карточками ниже.
+    node.append(body);
   } else {
     node.append(chooser, body);
   }
@@ -341,7 +343,8 @@ export function personalEvents(chart, { exactTime, days = 183, today = new Date(
     if (event.date < from || event.date > to) continue;
     const report = examine(chart, event.longitude, event.title);
     const limit = LIMIT[event.kind] ?? LIMIT.default;
-    const hits = report.hits.filter((hit) => PERSONAL.includes(hit.natal)
+    // Личные точки и начала домов (дома - только при точном времени).
+    const hits = report.hits.filter((hit) => (PERSONAL.includes(hit.natal) || hit.natalKind === 'cusp')
       && hit.orb <= limit && (exactTime || hit.natalKind === 'body'));
     if (hits.length) found.push({ event, hits, weight: weigh(event, hits, limit) });
   }
@@ -358,6 +361,7 @@ function weigh(event, hits, limit) {
   let weight = 0;
   for (const hit of hits) {
     weight += (1 - hit.orb / (limit + 0.5))
+      * (hit.natalKind === 'cusp' ? 0.6 : 1)
       * (LOUD.has(hit.natal) ? 1.3 : 1)
       * (HARD.has(hit.aspect.key) ? 1.3 : 1);
   }
@@ -373,8 +377,34 @@ export function strongestEvents(chart, options = {}, count = 8) {
     .sort((a, b) => a.event.date.localeCompare(b.event.date));
 }
 
-export function renderUpcoming(chart, { exactTime, onPick }) {
-  const found = strongestEvents(chart, { exactTime });
+// Каких сфер жизни касаются задетые точки: дом, где стоит планета, дома под
+// ее управлением, задетое начало дома, угол. Самые частые - первыми.
+function themesOf(chart, hits, exactTime) {
+  if (!exactTime) return [];
+  const rulership = ruledHouses(chart);
+  const count = new Map();
+  const add = (house) => count.set(house, (count.get(house) || 0) + 1);
+  for (const hit of hits) {
+    if (hit.natalKind === 'cusp') add(hit.house);
+    else if (hit.natal === 'asc') add(1);
+    else if (hit.natal === 'mc') add(10);
+    else {
+      const position = chart.positions.get(hit.natal);
+      if (position?.house) add(position.house);
+      for (const house of rulership.get(hit.natal) || []) add(house);
+    }
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])
+    .map(([house]) => content.house_short?.[String(house)] || content.houses?.[String(house)])
+    .filter(Boolean).slice(0, 3);
+}
+
+// onPick - открыть событие подробно. Без него (страница по ссылке из
+// рилса) список только показывает, что и о чем, а подробности - в
+// следующих рилсах. exclude - события, которые уже разобраны выше.
+export function renderUpcoming(chart, { exactTime, onPick = null, exclude = new Set() }) {
+  const found = strongestEvents(chart, { exactTime })
+    .filter(({ event }) => !exclude.has(event.key + event.date));
   const node = element('section', 'card');
   node.append(element('h2', null, 'Что из ближайшего заденет тебя'));
   if (!found.length) {
@@ -382,20 +412,52 @@ export function renderUpcoming(chart, { exactTime, onPick }) {
       'В ближайшие полгода крупных касаний к твоим личным точкам нет.'));
     return node;
   }
-  node.append(element('p', 'note',
-    'События неба на полгода вперед, которые ложатся точно на твои личные точки. '
-    + 'Нажми, чтобы прочитать, о чем это.'));
+  node.append(element('p', 'note', onPick
+    ? 'События неба на полгода вперед, которые ложатся точно на твои личные точки. '
+      + 'Нажми, чтобы прочитать, о чем это.'
+    : 'События неба на полгода вперед, которые ложатся точно на твои личные точки, '
+      + 'и каких сфер жизни они касаются. Подробный разбор каждого - ближе к дате, '
+      + 'в новом рилсе и по новой ссылке.'));
   const list = element('ul', 'upcoming');
   for (const { event, hits } of found) {
     const item = element('li');
-    const button = element('button', null);
-    button.type = 'button';
-    button.append(element('span', 'date', event.date.split('-').reverse().join('.')));
-    button.append(element('span', 'what', event.title));
-    button.append(element('span', 'touch', 'касается: '
-      + hits.map((hit) => `${nameOf(chart, hit)} (${hit.aspect.name.toLowerCase()})`).join(', ')));
-    button.addEventListener('click', () => onPick?.(event));
-    item.append(button);
+    const row = onPick ? element('button', null) : element('div', 'item');
+    if (onPick) {
+      row.type = 'button';
+      row.addEventListener('click', () => onPick(event));
+    }
+    row.append(element('span', 'date', event.date.split('-').reverse().join('.')));
+    row.append(element('span', 'what', event.title));
+    row.append(element('span', 'touch', 'касается: ' + hits.map((hit) => (hit.natalKind === 'cusp'
+      ? nameOf(chart, hit)
+      : `${nameOf(chart, hit)} (${hit.aspect.name.toLowerCase()})`)).join(', ')));
+    const themes = themesOf(chart, hits, exactTime);
+    if (themes.length) row.append(element('span', 'themes-line', `темы: ${themes.join(', ')}`));
+    item.append(row);
+    list.append(item);
+  }
+  node.append(list);
+  return node;
+}
+
+// Что еще будет в небе в ближайшие месяцы - только даты и названия.
+export function renderLater({ exclude = new Set(), days = 92, today = new Date() } = {}) {
+  const from = today.toISOString().slice(0, 10);
+  const to = new Date(today.getTime() + days * 86400000).toISOString().slice(0, 10);
+  const events = allEvents()
+    .filter((event) => event.date >= from && event.date <= to && !exclude.has(event.key + event.date))
+    .slice(0, 14);
+  if (!events.length) return null;
+  const node = element('section', 'card');
+  node.append(element('h2', null, 'Что еще будет в небе'));
+  node.append(element('p', 'note',
+    'Эти события касаются всех, а как именно - зависит от карты. '
+    + 'Ближе к каждой дате будет новый рилс и новая ссылка, где можно проверить себя.'));
+  const list = element('ul', 'later');
+  for (const event of events) {
+    const item = element('li');
+    item.append(element('span', 'date', event.date.split('-').reverse().slice(0, 2).join('.')));
+    item.append(element('span', null, event.title));
     list.append(item);
   }
   node.append(list);

@@ -335,3 +335,15 @@ header.landing h1 { font-size: 40px; }
 .card.compact { padding-top: 16px; padding-bottom: 16px; }
 .card.compact > .note { margin: 0; }
 .card.compact > .warn { margin: 10px 0 0; }
+.field-note { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.upcoming .item {
+  display: grid; grid-template-columns: 76px 1fr; gap: 2px 14px; padding: 14px 0;
+  font: 400 15px/1.4 var(--sans);
+}
+.upcoming .date { grid-row: 1 / span 3; }
+.upcoming .what, .upcoming .touch, .upcoming .themes-line { grid-column: 2; }
+.upcoming .themes-line { color: var(--accent-ink); font-size: 13px; }
+.later { list-style: none; margin: 14px 0 0; padding: 0; }
+.later li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.later li:last-child { border-bottom: 1px solid var(--line); }
+.later .date { color: var(--accent-ink); font-variant-numeric: lining-nums tabular-nums; }

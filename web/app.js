@@ -13,7 +13,7 @@ import {
 } from './readings.js';
 import {
   renderTransits, renderUpcoming, loadTransitTexts, neededSkyTexts, addSkyTexts,
-  askedEvent, eventHeading,
+  askedEvent, eventHeading, renderLater, strongestEvents,
 } from './transit-view.js';
 import { renderWheel } from './wheel.js';
 import { BY_KEY } from './astro/bodies.js';
@@ -335,33 +335,43 @@ function render(chart, exactTime) {
   if (!eventFirst) head.append(renderWheel(chart, { exactTime }));
   target.append(head);
 
-  const transits = renderTransits(chart, { exactTime, focus: eventFirst, skyAt });
-  const upcoming = transits ? renderUpcoming(chart, {
-    exactTime,
-    onPick: (event) => {
-      transits.showEvent(event);
-      transits.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    },
-  }) : null;
+  const reel = fromReel();
   const skyOffer = renderOffer('sky');
 
-  if (eventFirst) {
-    target.append(transits);
-    if (skyOffer) target.append(skyOffer);
+  if (reel) {
+    // Страница по ссылке из рилса: подробно только то, о чем был рилс.
+    // Остальное небо - списком: что заденет и каких сфер, что еще будет;
+    // разбор каждого события - в следующих рилсах.
+    const focused = eventFirst ? askedEvent() : null;
+    const shown = new Set(focused ? [focused.key + focused.date] : []);
+    if (focused) {
+      const transits = renderTransits(chart, { exactTime, focus: true, skyAt });
+      if (transits) target.append(transits);
+      if (skyOffer) target.append(skyOffer);
+    }
+    const upcoming = renderUpcoming(chart, { exactTime, exclude: shown });
     target.append(upcoming);
-  }
-
-  // Сначала то, ради чего человек пришел: разбор по теме. Небо и цифры ниже.
-  // По ссылке из рилса разбора по темам нет - страница только про рилс.
-  if (!fromReel()) {
+    for (const { event } of strongestEvents(chart, { exactTime })) shown.add(event.key + event.date);
+    const later = renderLater({ exclude: shown });
+    if (later) target.append(later);
+    if (!focused && skyOffer) target.append(skyOffer);
+  } else {
+    // Сначала то, ради чего человек пришел: разбор по теме. Небо и цифры ниже.
     const readings = renderReadings(chart, { exactTime });
     if (readings) target.append(readings);
     const readingsOffer = renderOffer('readings');
     if (readingsOffer) target.append(readingsOffer);
-  }
 
-  if (!eventFirst) {
-    if (transits) target.append(upcoming, transits);
+    const transits = renderTransits(chart, { exactTime });
+    if (transits) {
+      target.append(renderUpcoming(chart, {
+        exactTime,
+        onPick: (event) => {
+          transits.showEvent(event);
+          transits.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        },
+      }), transits);
+    }
     if (skyOffer) target.append(skyOffer);
   }
 
