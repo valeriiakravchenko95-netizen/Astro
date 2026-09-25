@@ -230,7 +230,8 @@ tr:last-child td { border-bottom: 0; }
 .wheel .event-axis { stroke: var(--sky); stroke-width: 1; stroke-dasharray: 3 3; }
 .wheel .sky-mark { stroke: var(--sky); stroke-width: 1.2; }
 .wheel .sky-planet { font-size: 18px; fill: var(--sky); }
-.wheel .planet.hit, .wheel .angle.hit { fill: var(--sky); }
+.wheel .planet.hit, .wheel .angle.hit, .wheel .house.hit { fill: var(--sky); }
+.wheel .cusp.hit, .wheel .axis.hit { stroke: var(--sky); stroke-width: 1.4; }
 .sky-legend { font-size: 13px; color: var(--muted); text-align: center; margin: 6px 0 0; }
 .sky-legend b { color: var(--sky); font-weight: 600; }
 

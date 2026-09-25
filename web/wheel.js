@@ -100,17 +100,20 @@ export function renderWheel(chart, { exactTime, overlay = null }) {
   // Какие углы задевает событие - их подписи тоже подсвечиваются.
   const touchedAngles = new Set((overlay?.hits || [])
     .filter((hit) => hit.natalKind === 'angle').map((hit) => hit.natal));
+  const touchedCusps = new Set((overlay?.hits || [])
+    .filter((hit) => hit.natalKind === 'cusp').map((hit) => hit.house));
 
   // Дома: куспиды от кольца знаков к внутреннему кругу, номер посередине.
   if (exactTime) {
     const cusps = chart.houses.get(chart.houseSystem).cusps;
     cusps.forEach((cusp, index) => {
       const angle = index === 0 || index === 9;
-      svg.append(line(cusp, R_SIGN, cusp, R_INNER, angle ? 'axis' : 'cusp'));
+      const hit = touchedCusps.has(index + 1) ? ' hit' : '';
+      svg.append(line(cusp, R_SIGN, cusp, R_INNER, `${angle ? 'axis' : 'cusp'}${hit}`));
       const next = cusps[(index + 1) % 12];
       const middle = cusp + ((((next - cusp) % 360) + 360) % 360) / 2;
       const [x, y] = point(middle, R_HOUSE_NUM);
-      svg.append(node('text', { x: x.toFixed(1), y: y.toFixed(1), class: 'house' }, String(index + 1)));
+      svg.append(node('text', { x: x.toFixed(1), y: y.toFixed(1), class: `house${hit}` }, String(index + 1)));
     });
     // Подписи углов снаружи круга.
     for (const [label, longitude] of [['ASC', chart.angles.asc], ['MC', chart.angles.mc]]) {

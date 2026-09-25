@@ -183,9 +183,9 @@ function skyLegend(bodies, report) {
   if (list) {
     legend.append(element('b', null, 'За кругом'), ` - где в день события стоят ${list}. `);
   }
-  if (report.hits.some((hit) => hit.natalKind !== 'cusp')) {
-    legend.append(element('b', null, 'Линии и коралловые значки внутри'),
-      ' - точки твоей карты, которые это задевает.');
+  if (report.hits.length) {
+    legend.append(element('b', null, 'Линии и коралловое внутри'),
+      ' - планеты, углы и начала домов твоей карты, которые это задевает.');
   } else {
     legend.append('Линий нет: точки твоей карты это не задевает.');
   }
