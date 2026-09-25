@@ -88,6 +88,9 @@ export function neededSkyTexts(chart, exactTime) {
     events.set(event.key + event.date, event);
     // свой текст на конкретный день бывает только у событий из ссылок
     wanted.push(['events', `${event.key}@${event.date}`]);
+    for (const form of ['conjunction', 'opposition', 'square', 'trine', 'sextile']) {
+      wanted.push(['forms', `${form}@${event.key}@${event.date}`]);
+    }
   }
   for (const event of events.values()) {
     wanted.push(['events', event.key]);
@@ -144,7 +147,10 @@ function chooseEvent(events) {
 // Текст касания. Если под точным ключом («square.venus», «cusp.10») текста
 // нет, он собирается из двух кусков: что в карте задето (points) и как
 // идет касание (forms). Для куспида - из названия темы дома.
-function contactText(hit) {
+// У события из ссылки могут быть свои формы касаний под ключом
+// «sextile@lunation.full@2026-09-26»: полнолуние с Нептуном просит
+// другого шага, чем обычное.
+function contactText(hit, event) {
   if (hit.natalKind === 'cusp') {
     const exact = content.contacts?.[`cusp.${hit.house}`];
     if (exact) return exact;
@@ -154,7 +160,8 @@ function contactText(hit) {
   const exact = content.contacts?.[`${hit.aspect.key}.${hit.natal}`];
   if (exact) return exact;
   const point = content.points?.[hit.natal];
-  const form = content.forms?.[hit.aspect.key];
+  const form = (event && content.forms?.[`${hit.aspect.key}@${event.key}@${event.date}`])
+    || content.forms?.[hit.aspect.key];
   return point && form ? `${point}\n\n${form}` : '';
 }
 
@@ -168,6 +175,23 @@ function nameOf(chart, hit) {
 // focus - страница открыта по ссылке на событие: сначала колесо с этим
 // событием поверх карты и его разбор, календарь остальных событий в конце.
 // skyAt(event) дает планеты неба на момент события для внешнего кольца.
+// Подпись под колесом: что нарисовано коралловым.
+function skyLegend(bodies, report) {
+  const legend = element('p', 'sky-legend');
+  const names = bodies.map((body) => body.name);
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} и ${names[names.length - 1]}` : names[0];
+  if (list) {
+    legend.append(element('b', null, 'За кругом'), ` - где в день события стоят ${list}. `);
+  }
+  if (report.hits.some((hit) => hit.natalKind !== 'cusp')) {
+    legend.append(element('b', null, 'Линии и коралловые значки внутри'),
+      ' - точки твоей карты, которые это задевает.');
+  } else {
+    legend.append('Линий нет: точки твоей карты это не задевает.');
+  }
+  return legend;
+}
+
 export function renderTransits(chart, { exactTime, focus = false, skyAt = null }) {
   const events = eventsAround();
   const chosen = chooseEvent(events);
@@ -192,11 +216,7 @@ export function renderTransits(chart, { exactTime, focus = false, skyAt = null }
         exactTime,
         overlay: { point: event.longitude, hits: report.hits, bodies: skyAt(event) },
       }));
-      const legend = element('p', 'sky-legend');
-      legend.append('Внутри - твоя карта. ');
-      legend.append(element('b', null, 'Снаружи и цветом'));
-      legend.append(' - небо в день события и задетые точки.');
-      body.append(legend);
+      body.append(skyLegend(skyAt(event), report));
     }
 
     const heading = element('h3', null, event.title);
@@ -243,7 +263,7 @@ export function renderTransits(chart, { exactTime, focus = false, skyAt = null }
     }
 
     for (const hit of report.hits) {
-      const written = contactText(hit);
+      const written = contactText(hit, event);
       if (!written) continue;
       const item = element('div', 'reading');
       item.append(element('h3', null, hit.natalKind === 'cusp'
