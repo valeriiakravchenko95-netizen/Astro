@@ -504,8 +504,12 @@ export function wavePeriod(chart, wave, ephemeris) {
   const step = 15;
   const passes = [];
   let previous = null;
+  let lastCovered = null;
   for (let jd = start; jd <= end; jd += step) {
-    if (ephemeris.covers && !ephemeris.covers(jd)) return { outside: true, passes };
+    if (ephemeris.covers && !ephemeris.covers(jd)) {
+      return { outside: true, passes, estimate: lastCovered && estimateAge(chart, wave, ephemeris, natal, lastCovered) };
+    }
+    lastCovered = jd;
     const off = norm180(ephemeris.position(wave.body, jd).longitude - natal - wave.angle);
     if (previous !== null && Math.sign(off) !== Math.sign(previous) && Math.abs(off - previous) < 20) {
       passes.push(jd - step / 2);
@@ -513,6 +517,20 @@ export function wavePeriod(chart, wave, ephemeris) {
     previous = off;
   }
   return { outside: false, passes };
+}
+
+// Если волна за пределами таблиц: сколько еще идти планете до нужного
+// градуса при ее среднем ходе за последние годы таблиц. Грубо, до года.
+function estimateAge(chart, wave, ephemeris, natal, jd) {
+  const now = ephemeris.position(wave.body, jd).longitude;
+  // Средний ход за четыре года: за один год попятная петля искажает скорость.
+  const before = ephemeris.position(wave.body, jd - 4 * YEAR).longitude;
+  const perYear = norm180(now - before) / 4;
+  if (Math.abs(perYear) < 0.05) return null;
+  const target = natal + wave.angle;
+  const left = ((((target - now) * Math.sign(perYear)) % 360) + 360) % 360;
+  const age = (jd + (left / Math.abs(perYear)) * YEAR - chart.jdTt) / YEAR;
+  return age >= wave.from - 2 && age <= wave.to + 6 ? Math.floor(age) : null;
 }
 
 function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } = {}) {
@@ -568,8 +586,9 @@ function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } 
       let when = first === last ? monthOf(first) : `${monthOf(first)} - ${monthOf(last)}`;
       if (found.outside) when += ' и дальше';
       rows.push({ wave, age, sort: first, when });
-    } else if (found.outside && wave.usual) {
-      rows.push({ wave, age: wave.usual, sort: chart.jdTt + wave.usual * YEAR, when: 'после 2035 года, точнее посчитаю на консультации', approx: true });
+    } else if (found.outside && (found.estimate || wave.usual)) {
+      const age = found.estimate || wave.usual;
+      rows.push({ wave, age, sort: chart.jdTt + age * YEAR, when: 'после 2035 года, точнее посчитаю на консультации', approx: true });
     } else if (found.outside) {
       rows.push({ wave, age: null, sort: chart.jdTt + wave.to * YEAR, when: 'после 2035 года, точнее посчитаю на консультации', approx: true });
     }
