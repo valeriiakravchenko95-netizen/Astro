@@ -27,7 +27,7 @@ const EVENT_DESCRIPTION = 'Проверь по своей натальной к�
 export function metaForCheck(check) {
   return {
     title: check.share || check.title,
-    description: CHECK_DESCRIPTION,
+    description: check.description || CHECK_DESCRIPTION,
     heading: check.heading || check.title,
     heading_em: check.heading_em ?? 'в твоей карте',
     lead: check.lead,

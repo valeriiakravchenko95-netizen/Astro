@@ -50,6 +50,17 @@ export function flattenCheckTexts(full) {
     for (const item of check.indicators || []) {
       if (item.text) flat[`${check.key}.i.${item.id}`] = item.text;
     }
+    // Страница «кризис средних лет»: варианты по дому, краски, волны.
+    if (check.notime) flat[`${check.key}.notime`] = check.notime;
+    for (const [house, item] of Object.entries(check.house || {})) {
+      flat[`${check.key}.house.${house}`] = item.text;
+      flat[`${check.key}.house.${house}.title`] = item.title;
+    }
+    for (const [body, item] of Object.entries(check.flavor || {})) {
+      flat[`${check.key}.flavor.${body}`] = item.text;
+      flat[`${check.key}.flavor.${body}.title`] = item.title;
+    }
+    for (const [wave, text] of Object.entries(check.wave || {})) flat[`${check.key}.wave.${wave}`] = text;
   }
   return flat;
 }
@@ -57,7 +68,7 @@ export function flattenCheckTexts(full) {
 // Что из проверки можно отдать странице заранее: условия, заголовки,
 // кодовое слово. Тексты - только с сервера.
 const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
-  'heading', 'heading_em', 'lead', 'houses_label'];
+  'heading', 'heading_em', 'lead', 'houses_label', 'kind'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
@@ -83,8 +94,15 @@ export function askedCheck() {
 
 export function neededCheckTexts(check) {
   if (!check) return [];
-  const keys = ['intro', 'outro', 'none', 'few', 'many'].map((field) => `${check.key}.${field}`);
-  for (const item of check.indicators) keys.push(`${check.key}.i.${item.id}`);
+  const keys = ['intro', 'outro', 'none', 'few', 'many', 'notime'].map((field) => `${check.key}.${field}`);
+  for (const item of check.indicators || []) keys.push(`${check.key}.i.${item.id}`);
+  if (check.kind === 'crisis') {
+    for (let house = 1; house <= 12; house += 1) {
+      keys.push(`${check.key}.house.${house}`, `${check.key}.house.${house}.title`);
+    }
+    for (const body of CRISIS_FLAVOR) keys.push(`${check.key}.flavor.${body}`, `${check.key}.flavor.${body}.title`);
+    for (const wave of WAVES) keys.push(`${check.key}.wave.${wave.key}`);
+  }
   return keys.map((key) => ['checks', key]);
 }
 
@@ -230,7 +248,7 @@ function evaluate(chart, when) {
 }
 
 export function runCheck(chart, check) {
-  const results = check.indicators.map((item) => {
+  const results = (check.indicators || []).map((item) => {
     const found = evaluate(chart, item.when);
     return {
       item,
@@ -444,7 +462,178 @@ async function shareStory(options, holder) {
 
 // --- вывод проверки --------------------------------------------------------------
 
-export function renderCheck(chart, check, { dmUrl = '', nick = '' } = {}) {
+// --- кризис средних лет --------------------------------------------------------
+//
+// Не счет «N из M», а свой вариант: в какой сфере копится желание перемен
+// (дом натального Урана), краски от его аспектов к личным планетам и личные
+// даты возрастных волн. Волны общие для всех ровесников, даты у каждого свои.
+
+const CRISIS_FLAVOR = ['sun', 'moon', 'mercury', 'venus', 'mars'];
+const CRISIS_ASPECTS = new Set(['conjunction', 'opposition', 'square', 'trine', 'sextile']);
+
+// angle - на сколько градусов вперед от натального положения стоит
+// транзитная планета в момент волны. from/to - возраст, где ее искать.
+// usual - обычный возраст для поколений 1975-1995, если дата за пределами
+// таблиц (у Плутона он зависит от года рождения, поэтому его нет).
+const WAVES = [
+  { key: 'nodes_return', body: 'true_node', angle: 0, from: 34, to: 40, usual: 37, title: 'Второе возвращение узлов' },
+  { key: 'saturn_square', body: 'saturn', angle: 90, from: 34, to: 40, usual: 37, title: 'Сатурн в квадрате к себе' },
+  { key: 'pluto_square', body: 'pluto', angle: 90, from: 30, to: 55, usual: null, title: 'Плутон в квадрате к себе' },
+  { key: 'neptune_square', body: 'neptune', angle: 90, from: 36, to: 45, usual: 40, title: 'Нептун в квадрате к себе' },
+  { key: 'uranus_opposition', body: 'uranus', angle: 180, from: 38, to: 48, usual: 43, title: 'Уран напротив себя' },
+  { key: 'saturn_opposition', body: 'saturn', angle: 180, from: 41, to: 47, usual: 44, title: 'Сатурн напротив себя' },
+  { key: 'nodes_inversion', body: 'true_node', angle: 180, from: 44, to: 49, usual: 46, title: 'Инверсия узлов' },
+];
+
+const YEAR = 365.25;
+const MONTH_NAMES = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август',
+  'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+
+function monthOf(jd) {
+  const date = new Date((jd - 2440587.5) * 86400000);
+  return `${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+}
+
+// Все точные проходы волны в ее окне возраста - шагом в полмесяца. Из-за
+// попятного движения их бывает до трех; период - от первого до последнего.
+export function wavePeriod(chart, wave, ephemeris) {
+  const natal = chart.positions.get(wave.body)?.longitude;
+  if (natal === undefined || !ephemeris) return null;
+  const start = chart.jdTt + wave.from * YEAR;
+  const end = chart.jdTt + wave.to * YEAR;
+  const step = 15;
+  const passes = [];
+  let previous = null;
+  for (let jd = start; jd <= end; jd += step) {
+    if (ephemeris.covers && !ephemeris.covers(jd)) return { outside: true, passes };
+    const off = norm180(ephemeris.position(wave.body, jd).longitude - natal - wave.angle);
+    if (previous !== null && Math.sign(off) !== Math.sign(previous) && Math.abs(off - previous) < 20) {
+      passes.push(jd - step / 2);
+    }
+    previous = off;
+  }
+  return { outside: false, passes };
+}
+
+function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } = {}) {
+  const node = element('section', 'card check-card crisis');
+  node.append(element('h2', null, check.title));
+  const intro = texts[`${check.key}.intro`];
+  if (intro) node.append(...textNodes(intro));
+
+  // Сфера бунта - дом натального Урана.
+  const uranus = chart.positions.get('uranus');
+  const house = chart.exactTime !== false ? uranus?.house : null;
+  let typeTitle = '';
+  if (house) {
+    typeTitle = texts[`${check.key}.house.${house}.title`] || '';
+    const block = element('div', 'reading hit');
+    block.append(element('h3', null, typeTitle ? `Твой вариант: ${typeTitle}` : 'Твой вариант'));
+    block.append(element('p', 'where', `Уран в ${house} доме`));
+    const text = texts[`${check.key}.house.${house}`];
+    if (text) block.append(...textNodes(text));
+    node.append(block);
+  } else {
+    const notime = texts[`${check.key}.notime`];
+    if (notime) node.append(element('div', 'warn', inGender(notime)));
+  }
+
+  // Краски - аспекты Урана к личным планетам.
+  const flavors = [];
+  for (const hit of chart.aspects || []) {
+    if (!CRISIS_ASPECTS.has(hit.aspect.key)) continue;
+    const other = hit.bodyA === 'uranus' ? hit.bodyB : (hit.bodyB === 'uranus' ? hit.bodyA : null);
+    if (!other || !CRISIS_FLAVOR.includes(other) || flavors.some((f) => f.body === other)) continue;
+    flavors.push({ body: other, aspect: hit.aspect });
+  }
+  for (const { body, aspect } of flavors) {
+    const text = texts[`${check.key}.flavor.${body}`];
+    if (!text) continue;
+    const block = element('div', 'reading');
+    block.append(element('h3', null, texts[`${check.key}.flavor.${body}.title`] || name(chart, body)));
+    block.append(element('p', 'where', `Уран - ${name(chart, body)}, ${aspect.name.toLowerCase()}`));
+    block.append(...textNodes(text));
+    node.append(block);
+  }
+
+  // Волны с личными датами.
+  const rows = [];
+  for (const wave of WAVES) {
+    const found = wavePeriod(chart, wave, ephemeris);
+    if (!found) continue;
+    if (found.passes.length) {
+      const first = found.passes[0];
+      const last = found.passes[found.passes.length - 1];
+      const age = Math.floor((first - chart.jdTt) / YEAR);
+      let when = first === last ? monthOf(first) : `${monthOf(first)} - ${monthOf(last)}`;
+      if (found.outside) when += ' и дальше';
+      rows.push({ wave, age, sort: first, when });
+    } else if (found.outside && wave.usual) {
+      rows.push({ wave, age: wave.usual, sort: chart.jdTt + wave.usual * YEAR, when: 'после 2035 года, точнее посчитаю на консультации', approx: true });
+    } else if (found.outside) {
+      rows.push({ wave, age: null, sort: chart.jdTt + wave.to * YEAR, when: 'после 2035 года, точнее посчитаю на консультации', approx: true });
+    }
+  }
+  rows.sort((a, b) => a.sort - b.sort);
+  if (rows.length) {
+    const box = element('div', 'waves');
+    box.append(element('h3', null, 'Твои волны'));
+    box.append(element('p', 'note', 'Через эти волны проходят все ровесники. Даты - твои, по твоей карте.'));
+    const list = element('ul', 'upcoming');
+    for (const row of rows) {
+      const item = element('li');
+      const line = element('div', 'item');
+      line.append(element('span', 'date', row.age === null ? '·' : `${row.approx ? 'около ' : ''}${row.age}`));
+      line.append(element('span', 'what', row.wave.title));
+      line.append(element('span', 'touch', row.when));
+      const text = texts[`${check.key}.wave.${row.wave.key}`];
+      if (text) {
+        const about = element('span', 'themes-line');
+        about.append(inGender(text));
+        line.append(about);
+      }
+      item.append(line);
+      list.append(item);
+    }
+    box.append(list);
+    node.append(box);
+  }
+
+  const outro = texts[`${check.key}.outro`];
+  if (outro) node.append(...textNodes(outro));
+
+  if (check.code_word) {
+    const cta = element('div', 'cta');
+    cta.append(...textNodes(inGender(check.cta || 'Хочешь разобрать, как это работает именно у тебя? Напиши мне в директ слово')));
+    cta.append(element('span', 'word', check.code_word));
+    if (dmUrl) {
+      const link = element('a', 'button', 'Написать в директ');
+      link.href = dmUrl;
+      link.rel = 'noopener';
+      cta.append(link);
+    }
+    node.append(cta);
+  }
+
+  const bunt = rows.find((row) => row.wave.key === 'uranus_opposition');
+  const share = element('button', 'share', 'Сохранить результат для сторис');
+  share.type = 'button';
+  const holder = element('div', 'story-holder');
+  share.addEventListener('click', () => shareStory({
+    title: check.share || check.title,
+    big: bunt?.age ? `${bunt.age}` : '·',
+    small: bunt?.age ? 'лет - мой бунт' : 'моя карта',
+    lines: [typeTitle, ...rows.filter((row) => row.age).slice(0, 4).map((row) => `${row.age} - ${row.wave.title}`)]
+      .filter(Boolean),
+    link: `${location.host}${check.slug ? `/${check.slug}` : `/?check=${check.key}`}`,
+    nick,
+  }, holder));
+  node.append(share, holder);
+  return node;
+}
+
+export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = null } = {}) {
+  if (check.kind === 'crisis') return renderCrisis(chart, check, { dmUrl, nick, ephemeris });
   const { results, yes, no, unknown } = runCheck(chart, check);
   const node = element('section', 'card check-card');
   node.append(element('h2', null, check.title));

@@ -283,7 +283,34 @@ function skyAt(event) {
 const WHEEL_BODIES = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn',
   'uranus', 'neptune', 'pluto', 'true_node', 'mean_lilith'];
 
+// Для страницы «кризис средних лет»: Уран, его дом и личные планеты, с
+// которыми он в аспекте.
+const CRISIS_BODIES = ['sun', 'moon', 'mercury', 'venus', 'mars'];
+
+function renderCrisisWheel(chart, exactTime) {
+  const node = card('Где это в твоей карте');
+  const uranus = chart.positions.get('uranus');
+  const houses = exactTime && uranus?.house ? [uranus.house] : [];
+  const linked = [];
+  for (const hit of chart.aspects || []) {
+    const other = hit.bodyA === 'uranus' ? hit.bodyB : (hit.bodyB === 'uranus' ? hit.bodyA : null);
+    if (other && CRISIS_BODIES.includes(other) && !linked.includes(other)
+      && ['conjunction', 'opposition', 'square', 'trine', 'sextile'].includes(hit.aspect.key)) linked.push(other);
+  }
+  node.append(renderWheel(chart, { exactTime, highlight: { houses, bodies: ['uranus', ...linked] } }));
+  const legend = element('p', 'sky-legend');
+  legend.append(element('b', null, houses.length ? `Коралловым - Уран и ${houses[0]} дом` : 'Коралловым - Уран'),
+    houses.length ? ': сфера, где копится желание перемен' : '');
+  if (linked.length) {
+    legend.append(`, и планеты, которым он добавляет краски: ${linked.map((key) => chart.positions.get(key).body.name).join(', ')}`);
+  }
+  legend.append('.');
+  node.append(legend);
+  return node;
+}
+
 function renderCheckWheel(chart, check, exactTime) {
+  if (check.kind === 'crisis') return renderCrisisWheel(chart, exactTime);
   const node = card('Где это в твоей карте');
   const houses = exactTime ? check.houses || [] : [];
   const bodies = new Set();
@@ -325,7 +352,9 @@ function render(chart, exactTime) {
   let target = result;
   if (check) {
     result.append(renderCheckWheel(chart, check, exactTime));
-    result.append(renderCheck(chart, check, { dmUrl: siteSettings().dm_url, nick: instagramNick() }));
+    result.append(renderCheck(chart, check, {
+      dmUrl: siteSettings().dm_url, nick: instagramNick(), ephemeris,
+    }));
     const offer = check.code_word ? null : renderOffer('readings');
     if (offer) result.append(offer);
     const more = element('button', 'more', 'Показать мою карту');
