@@ -706,12 +706,16 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
   // Ведущая манера: группа, в которой больше всего совпадений.
   const groups = new Map();
   for (const { item } of yes) if (item.group) groups.set(item.group, (groups.get(item.group) || 0) + 1);
-  const leading = [...groups.entries()].sort((a, b) => b[1] - a[1])[0];
-  if (leading && texts[`${check.key}.group.${leading[0]}`]) {
+  // При равенстве ведущих манер две - так и показываем обе.
+  const top = Math.max(0, ...groups.values());
+  const leading = [...groups.entries()].filter(([, count]) => count === top).map(([id]) => id)
+    .filter((id) => texts[`${check.key}.group.${id}`]);
+  for (const id of leading) {
     const block = element('div', 'reading lead-group');
-    const title = texts[`${check.key}.group.${leading[0]}.title`];
-    block.append(element('h3', null, title ? `Твоя ведущая манера: ${title}` : 'Твоя ведущая манера'));
-    block.append(...textNodes(texts[`${check.key}.group.${leading[0]}`]));
+    const title = texts[`${check.key}.group.${id}.title`];
+    const label = leading.length > 1 ? 'Твоя манера' : 'Твоя ведущая манера';
+    block.append(element('h3', null, title ? `${label}: ${title}` : label));
+    block.append(...textNodes(texts[`${check.key}.group.${id}`]));
     node.append(block);
   }
 
@@ -724,7 +728,8 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
       const block = element('div', 'reading');
       const title = texts[`${check.key}.element.${id}.title`];
       block.append(element('h3', null, title ? `Твой стиль: ${title}` : 'Твой стиль'));
-      block.append(element('p', 'where', `${position.body.name} ${SIGNS_IN[position.sign.index]}`));
+      const sign = SIGNS_IN[position.sign.index];
+      block.append(element('p', 'where', `${position.body.name} ${sign === 'Льве' ? 'во' : 'в'} ${sign}`));
       block.append(...textNodes(text));
       node.append(block);
     }
