@@ -184,7 +184,8 @@ const CONDITIONS = {
     for (const hit of chart.aspects) {
       const pairs = [[hit.bodyA, hit.bodyB], [hit.bodyB, hit.bodyA]];
       const matches = pairs.some(([x, y]) => list(spec.a).includes(x) && list(spec.b).includes(y));
-      if (matches && (!kinds || kinds.includes(hit.aspect.key))) {
+      // orb - свой допуск проверки, уже общего орбиса карты.
+      if (matches && (!kinds || kinds.includes(hit.aspect.key)) && (!spec.orb || hit.orb <= spec.orb)) {
         return `${name(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${name(chart, hit.bodyB)}`;
       }
     }
@@ -706,9 +707,14 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
   // Ведущая манера: группа, в которой больше всего совпадений.
   const groups = new Map();
   for (const { item } of yes) if (item.group) groups.set(item.group, (groups.get(item.group) || 0) + 1);
+  // Ведущая - группа с наибольшей долей совпавших показателей: в группах
+  // разное число показателей, и простой счет тянул бы к самой большой.
+  const sizes = new Map();
+  for (const item of check.indicators || []) if (item.group) sizes.set(item.group, (sizes.get(item.group) || 0) + 1);
+  const shares = new Map([...groups.entries()].map(([id, count]) => [id, count / sizes.get(id)]));
+  const top = Math.max(0, ...shares.values());
   // При равенстве ведущих манер две - так и показываем обе.
-  const top = Math.max(0, ...groups.values());
-  const leading = [...groups.entries()].filter(([, count]) => count === top).map(([id]) => id)
+  const leading = [...shares.entries()].filter(([, value]) => Math.abs(value - top) < 1e-9).map(([id]) => id)
     .filter((id) => texts[`${check.key}.group.${id}`]);
   for (const id of leading) {
     const block = element('div', 'reading lead-group');

@@ -322,7 +322,8 @@ function renderBodyWheel(chart, check, exactTime) {
     const kinds = spec.aspects || ['conjunction', 'square', 'opposition', 'trine', 'sextile'];
     for (const hit of chart.aspects || []) {
       const other = hit.bodyA === key ? hit.bodyB : (hit.bodyB === key ? hit.bodyA : null);
-      if (other && [spec.b].flat().includes(other) && kinds.includes(hit.aspect.key) && !linked.includes(other)) {
+      if (other && [spec.b].flat().includes(other) && kinds.includes(hit.aspect.key) && !linked.includes(other)
+        && (!spec.orb || hit.orb <= spec.orb)) {
         linked.push(other);
       }
     }
