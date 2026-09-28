@@ -348,3 +348,4 @@ header.landing h1 { font-size: 40px; }
 .later li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
 .later li:last-child { border-bottom: 1px solid var(--line); }
 .later .date { color: var(--accent-ink); font-variant-numeric: lining-nums tabular-nums; }
+.check-card .reading h3:not(:first-child) { margin-top: 22px; }
