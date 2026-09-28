@@ -713,7 +713,16 @@ export function pressureWindows(chart, ephemeris, { from, to, body = 'pluto', ta
       if (!open) open = { key: near.key, start: jd, end: jd, exact: [] };
       open.end = jd;
       if (previous && previous.key === near.key && Math.sign(previous.signed) !== Math.sign(signed)) {
-        open.exact.push(jd - step / 2);
+        // Уточняем день точного аспекта делением отрезка пополам.
+        const angle = HARD[near.key] + (near.key === 'square' && offset > 180 ? 180 : 0);
+        const off = (x) => norm180(ephemeris.position(body, x).longitude - natal - angle);
+        let lo = jd - step;
+        let hi = jd;
+        for (let i = 0; i < 12; i += 1) {
+          const mid = (lo + hi) / 2;
+          if (Math.sign(off(mid)) === Math.sign(off(lo))) lo = mid; else hi = mid;
+        }
+        open.exact.push((lo + hi) / 2);
       }
     } else if (open) {
       windows.push(open);
