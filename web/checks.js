@@ -61,17 +61,13 @@ export function flattenCheckTexts(full) {
       flat[`${check.key}.flavor.${body}.title`] = item.title;
     }
     for (const [wave, text] of Object.entries(check.wave || {})) flat[`${check.key}.wave.${wave}`] = text;
-    // Страница «Марс под Плутоном».
-    for (const field of ['now_yes', 'now_no', 'past']) {
-      if (check[field]) flat[`${check.key}.${field}`] = check[field];
-    }
-    for (const group of ['element', 'natal']) {
-      for (const [id, item] of Object.entries(check[group] || {})) {
-        flat[`${check.key}.${group}.${id}`] = item.text;
-        flat[`${check.key}.${group}.${id}.title`] = item.title;
+    // Ведущая манера по группам показателей и стиль по стихии Марса.
+    for (const field of ['group', 'element']) {
+      for (const [id, item] of Object.entries(check[field] || {})) {
+        flat[`${check.key}.${field}.${id}`] = item.text;
+        flat[`${check.key}.${field}.${id}.title`] = item.title;
       }
     }
-    for (const [form, text] of Object.entries(check.form || {})) flat[`${check.key}.form.${form}`] = text;
   }
   return flat;
 }
@@ -79,12 +75,12 @@ export function flattenCheckTexts(full) {
 // Что из проверки можно отдать странице заранее: условия, заголовки,
 // кодовое слово. Тексты - только с сервера.
 const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
-  'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'spheres'];
+  'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
     ...Object.fromEntries(PUBLIC_FIELDS.filter((field) => field in check).map((field) => [field, check[field]])),
-    indicators: (check.indicators || []).map(({ id, title, when }) => ({ id, title, when })),
+    indicators: (check.indicators || []).map(({ id, title, when, group }) => ({ id, title, when, group })),
   }));
 }
 
@@ -114,11 +110,11 @@ export function neededCheckTexts(check) {
     for (const body of CRISIS_FLAVOR) keys.push(`${check.key}.flavor.${body}`, `${check.key}.flavor.${body}.title`);
     for (const wave of WAVES) keys.push(`${check.key}.wave.${wave.key}`);
   }
-  if (check.kind === 'mars_pluto') {
-    for (const field of ['now_yes', 'now_no', 'past']) keys.push(`${check.key}.${field}`);
-    for (const id of ['fire', 'earth', 'air', 'water']) keys.push(`${check.key}.element.${id}`, `${check.key}.element.${id}.title`);
-    for (const id of MARS_NATAL) keys.push(`${check.key}.natal.${id}`, `${check.key}.natal.${id}.title`);
-    for (const form of ['conjunction', 'opposition', 'square']) keys.push(`${check.key}.form.${form}`);
+  for (const id of new Set((check.indicators || []).map((item) => item.group).filter(Boolean))) {
+    keys.push(`${check.key}.group.${id}`, `${check.key}.group.${id}.title`);
+  }
+  if (check.element_of) {
+    for (const id of ELEMENT) keys.push(`${check.key}.element.${id}`, `${check.key}.element.${id}.title`);
   }
   return keys.map((key) => ['checks', key]);
 }
@@ -218,6 +214,14 @@ const CONDITIONS = {
     const inside = bodies.filter((body) => list(spec.houses).includes(chart.positions.get(body)?.house));
     if (inside.length >= (spec.min || 1)) {
       return `${inside.map((body) => name(chart, body)).join(', ')} в ${list(spec.houses).join(', ')} домах`;
+    }
+    return null;
+  },
+
+  retrograde(chart, spec) {
+    for (const body of list(spec.bodies)) {
+      const position = chart.positions.get(body);
+      if (position?.retrograde) return `${position.body.name} ретроградный`;
     }
     return null;
   },
@@ -668,228 +672,10 @@ function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } 
   return node;
 }
 
-// --- Марс под Плутоном -----------------------------------------------------------
-//
-// Как у человека выходит злость (стихия натального Марса и его напряженные
-// аспекты к Плутону, Сатурну, Урану) и когда транзитный Плутон давит на
-// Марс: соединение, квадрат, оппозиция с орбисом 3°, как у остальных
-// транзитов сайта. Периоды - за последние шесть лет и вперед до конца таблиц.
-
-const MARS_NATAL = ['pluto', 'saturn', 'uranus'];
-const HARD = { conjunction: 0, square: 90, opposition: 180 };
-const PRESSURE_ORB = 3;
 const ELEMENT = ['fire', 'earth', 'air', 'water'];
-
-export function jdNow(now = new Date()) {
-  return now.getTime() / 86400000 + 2440587.5 + 69 / 86400;
-}
-
-function aspectKeyOf(offset) {
-  // offset - угол транзита от натальной точки, 0..360
-  const around = [['conjunction', 0], ['square', 90], ['opposition', 180], ['square', 270], ['conjunction', 360]];
-  let best = null;
-  for (const [key, angle] of around) {
-    const orb = Math.abs(offset - angle);
-    if (!best || orb < best.orb) best = { key, orb };
-  }
-  return best;
-}
-
-// Окна давления: пока Плутон в пределах орбиса от напряженного аспекта к Марсу.
-export function pressureWindows(chart, ephemeris, { from, to, body = 'pluto', target = 'mars', orb = PRESSURE_ORB } = {}) {
-  const natal = chart.positions.get(target)?.longitude;
-  if (natal === undefined || !ephemeris) return { windows: [], limit: null };
-  const step = 10;
-  const windows = [];
-  let open = null;
-  let previous = null;
-  let limit = null;
-  for (let jd = from; jd <= to; jd += step) {
-    if (ephemeris.covers && !ephemeris.covers(jd)) { limit = jd; break; }
-    const offset = ((ephemeris.position(body, jd).longitude - natal) % 360 + 360) % 360;
-    const near = aspectKeyOf(offset);
-    const signed = norm180(offset - HARD[near.key] * (offset > 270 && near.key === 'square' ? 3 : 1));
-    if (near.orb <= orb) {
-      if (!open) open = { key: near.key, start: jd, end: jd, exact: [] };
-      open.end = jd;
-      if (previous && previous.key === near.key && Math.sign(previous.signed) !== Math.sign(signed)) {
-        // Уточняем день точного аспекта делением отрезка пополам.
-        const angle = HARD[near.key] + (near.key === 'square' && offset > 180 ? 180 : 0);
-        const off = (x) => norm180(ephemeris.position(body, x).longitude - natal - angle);
-        let lo = jd - step;
-        let hi = jd;
-        for (let i = 0; i < 12; i += 1) {
-          const mid = (lo + hi) / 2;
-          if (Math.sign(off(mid)) === Math.sign(off(lo))) lo = mid; else hi = mid;
-        }
-        open.exact.push((lo + hi) / 2);
-      }
-    } else if (open) {
-      windows.push(open);
-      open = null;
-    }
-    previous = { key: near.key, signed };
-  }
-  if (open) { open.openEnded = limit !== null; windows.push(open); }
-  return { windows: mergeWindows(windows), limit };
-}
-
-// Плутон медленный и петляет: у края орбиса один проход рвется на несколько
-// окон. Окна одного аспекта с разрывом меньше года - это один период.
-function mergeWindows(windows) {
-  const merged = [];
-  for (const w of windows) {
-    const last = merged[merged.length - 1];
-    if (last && last.key === w.key && w.start - last.end < 400) {
-      last.end = w.end;
-      last.exact.push(...w.exact);
-      last.openEnded = w.openEnded;
-    } else {
-      merged.push({ ...w, exact: [...w.exact] });
-    }
-  }
-  return merged;
-}
-
-function dayOf(jd) {
-  const date = new Date((jd - 2440587.5) * 86400000);
-  return `${date.getUTCDate()} ${['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа',
-    'сентября', 'октября', 'ноября', 'декабря'][date.getUTCMonth()]} ${date.getUTCFullYear()}`;
-}
-
-const HARD_NAMES = { conjunction: 'соединение', square: 'квадрат', opposition: 'оппозиция' };
-
-function renderMarsPluto(chart, check, { dmUrl = '', nick = '', ephemeris = null } = {}) {
-  const node = element('section', 'card check-card mars-pluto');
-  node.append(element('h2', null, check.title));
-  const intro = texts[`${check.key}.intro`];
-  if (intro) node.append(...textNodes(intro));
-
-  const now = jdNow();
-  const { windows, limit } = pressureWindows(chart, ephemeris, { from: now - 6 * YEAR, to: now + 12 * YEAR });
-  // Ядро периода - когда до точного аспекта меньше градуса.
-  const { windows: cores } = pressureWindows(chart, ephemeris, { from: now - 6 * YEAR, to: now + 12 * YEAR, orb: 1 });
-  const coreOf = (w) => {
-    const inside = cores.filter((c) => c.key === w.key && c.end >= w.start && c.start <= w.end);
-    return inside.length ? { start: inside[0].start, end: inside[inside.length - 1].end } : null;
-  };
-  const current = windows.find((w) => w.start <= now && (w.end >= now || w.openEnded));
-  const past = windows.filter((w) => w.end < now);
-  const future = windows.filter((w) => w.start > now);
-
-  // Сейчас.
-  const status = element('div', 'reading hit');
-  if (current) {
-    status.append(element('h3', null, `Сейчас: да, ${HARD_NAMES[current.key]}`));
-    status.append(element('p', 'where', `${monthOf(current.start)} - ${current.openEnded ? 'дальше 2035 года' : monthOf(current.end)}`));
-    const text = texts[`${check.key}.now_yes`];
-    if (text) status.append(...textNodes(text));
-    const form = texts[`${check.key}.form.${current.key}`];
-    if (form) {
-      status.append(element('h3', null, 'Что делать, пока давление рядом'));
-      status.append(...textNodes(form));
-    }
-  } else {
-    status.append(element('h3', null, 'Сейчас: нет'));
-    const text = texts[`${check.key}.now_no`];
-    if (text) status.append(...textNodes(text));
-  }
-  node.append(status);
-
-  // Периоды: недавние и будущие.
-  const periods = [...past.slice(-1), ...(current ? [current] : []), ...future.slice(0, 2)];
-  if (periods.length) {
-    const box = element('div', 'waves');
-    box.append(element('h3', null, 'Твои периоды'));
-    const list = element('ul', 'upcoming');
-    for (const w of periods) {
-      const item = element('li');
-      const line = element('div', 'item');
-      const tag = w === current ? 'сейчас' : (w.end < now ? 'было' : 'будет');
-      line.append(element('span', 'date', tag));
-      line.append(element('span', 'what', `${monthOf(w.start)} - ${w.openEnded ? 'дальше 2035 года' : monthOf(w.end)}`));
-      line.append(element('span', 'touch', `${HARD_NAMES[w.key]} к твоему Марсу`));
-      const core = coreOf(w);
-      if (core) line.append(element('span', 'themes-line', `сильнее всего: ${monthOf(core.start)} - ${monthOf(core.end)}`));
-      if (w.exact.length) line.append(element('span', 'themes-line', `точные дни: ${w.exact.map(dayOf).join(', ')}`));
-      item.append(line);
-      list.append(item);
-    }
-    box.append(list);
-    if (past.length && !current) {
-      const text = texts[`${check.key}.past`];
-      if (text) box.append(...textNodes(text));
-    }
-    if (!future.length && !current && limit) {
-      box.append(element('p', 'note', 'До конца 2035 года новых периодов нет.'));
-    }
-    node.append(box);
-  } else {
-    node.append(element('p', 'note', 'В ближайшие годы такого давления на твой Марс нет.'));
-  }
-
-  // Как у тебя выходит злость: стихия Марса и его напряженные аспекты.
-  const mars = chart.positions.get('mars');
-  if (mars) {
-    const element_ = ELEMENT[signIndex(mars.longitude) % 4];
-    const title = texts[`${check.key}.element.${element_}.title`];
-    const text = texts[`${check.key}.element.${element_}`];
-    if (text) {
-      const block = element('div', 'reading');
-      block.append(element('h3', null, title ? `Твоя злость: ${title}` : 'Твоя злость'));
-      const sphere = chart.exactTime !== false && mars.house && check.spheres?.[String(mars.house)];
-      block.append(element('p', 'where', `Марс ${SIGNS_IN[signIndex(mars.longitude)]}${sphere ? `, ${mars.house} дом - ${sphere}` : ''}`));
-      block.append(...textNodes(text));
-      node.append(block);
-    }
-    for (const id of MARS_NATAL) {
-      const hit = (chart.aspects || []).find((a) => ((a.bodyA === 'mars' && a.bodyB === id) || (a.bodyB === 'mars' && a.bodyA === id))
-        && ['conjunction', 'square', 'opposition'].includes(a.aspect.key));
-      const text = hit && texts[`${check.key}.natal.${id}`];
-      if (!text) continue;
-      const block = element('div', 'reading');
-      block.append(element('h3', null, texts[`${check.key}.natal.${id}.title`] || name(chart, id)));
-      block.append(element('p', 'where', `Марс - ${name(chart, id)}, ${hit.aspect.name.toLowerCase()}, с рождения`));
-      block.append(...textNodes(text));
-      node.append(block);
-    }
-  }
-
-  const outro = texts[`${check.key}.outro`];
-  if (outro) node.append(...textNodes(outro));
-
-  if (check.code_word) {
-    const cta = element('div', 'cta');
-    cta.append(...textNodes(inGender(check.cta || 'Хочешь разобрать, как это работает именно у тебя? Напиши мне в директ слово')));
-    cta.append(element('span', 'word', check.code_word));
-    if (dmUrl) {
-      const link = element('a', 'button', 'Написать в директ');
-      link.href = dmUrl;
-      link.rel = 'noopener';
-      cta.append(link);
-    }
-    node.append(cta);
-  }
-
-  const share = element('button', 'share', 'Сохранить результат для сторис');
-  share.type = 'button';
-  const holder = element('div', 'story-holder');
-  const main = current || future[0];
-  share.addEventListener('click', () => shareStory({
-    title: check.share || check.title,
-    big: current ? 'да' : 'нет',
-    small: current ? 'мой Марс сейчас под Плутоном' : 'сейчас давления нет',
-    lines: main ? [`${monthOf(main.start)} - ${main.openEnded ? 'дальше 2035 года' : monthOf(main.end)}`] : [],
-    link: `${location.host}${check.slug ? `/${check.slug}` : `/?check=${check.key}`}`,
-    nick,
-  }, holder));
-  node.append(share, holder);
-  return node;
-}
 
 export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = null } = {}) {
   if (check.kind === 'crisis') return renderCrisis(chart, check, { dmUrl, nick, ephemeris });
-  if (check.kind === 'mars_pluto') return renderMarsPluto(chart, check, { dmUrl, nick, ephemeris });
   const { results, yes, no, unknown } = runCheck(chart, check);
   const node = element('section', 'card check-card');
   node.append(element('h2', null, check.title));
@@ -916,6 +702,33 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
   if (summary) node.append(...textNodes(summary));
   const intro = texts[`${check.key}.intro`];
   if (intro) node.append(...textNodes(intro));
+
+  // Ведущая манера: группа, в которой больше всего совпадений.
+  const groups = new Map();
+  for (const { item } of yes) if (item.group) groups.set(item.group, (groups.get(item.group) || 0) + 1);
+  const leading = [...groups.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (leading && texts[`${check.key}.group.${leading[0]}`]) {
+    const block = element('div', 'reading lead-group');
+    const title = texts[`${check.key}.group.${leading[0]}.title`];
+    block.append(element('h3', null, title ? `Твоя ведущая манера: ${title}` : 'Твоя ведущая манера'));
+    block.append(...textNodes(texts[`${check.key}.group.${leading[0]}`]));
+    node.append(block);
+  }
+
+  // Стиль по стихии планеты (у проверки злости - Марса).
+  if (check.element_of) {
+    const position = chart.positions.get(check.element_of);
+    const id = position && ELEMENT[position.sign.index % 4];
+    const text = id && texts[`${check.key}.element.${id}`];
+    if (text) {
+      const block = element('div', 'reading');
+      const title = texts[`${check.key}.element.${id}.title`];
+      block.append(element('h3', null, title ? `Твой стиль: ${title}` : 'Твой стиль'));
+      block.append(element('p', 'where', `${position.body.name} ${SIGNS_IN[position.sign.index]}`));
+      block.append(...textNodes(text));
+      node.append(block);
+    }
+  }
 
   for (const { item, because } of yes) {
     const block = element('div', 'reading hit');

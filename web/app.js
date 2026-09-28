@@ -25,7 +25,7 @@ import {
 import { loadEvents } from './astro/transits.js';
 import { setGender, textNodes } from './text.js';
 import {
-  loadChecks, askedCheck, neededCheckTexts, addCheckTexts, renderCheck, jdNow,
+  loadChecks, askedCheck, neededCheckTexts, addCheckTexts, renderCheck,
 } from './checks.js';
 
 const form = document.getElementById('form');
@@ -309,35 +309,38 @@ function renderCrisisWheel(chart, exactTime) {
   return node;
 }
 
-// Для «Марс под Плутоном»: Марс подсвечен, за кругом - где Плутон сегодня,
-// и линия между ними, если давление идет сейчас.
-function renderMarsWheel(chart, exactTime) {
+// Для проверки вокруг одной планеты (злость - Марс): она подсвечена вместе
+// с планетами, с которыми у нее совпали аспекты из показателей, и ее домом.
+function renderBodyWheel(chart, check, exactTime) {
   const node = card('Где это в твоей карте');
-  const mars = chart.positions.get('mars');
-  const pluto = ephemeris.position('pluto', jdNow()).longitude;
-  const offset = ((pluto - mars.longitude) % 360 + 360) % 360;
-  const hard = [['conjunction', 0], ['square', 90], ['opposition', 180], ['square', 270], ['conjunction', 360]]
-    .map(([key, angle]) => ({ key, orb: Math.abs(offset - angle) })).sort((a, b) => a.orb - b.orb)[0];
-  const touching = hard.orb <= 3;
-  const hits = touching
-    ? [{ natalKind: 'body', natal: 'mars', source: pluto, aspect: { key: hard.key } }]
-    : [];
-  node.append(renderWheel(chart, {
-    exactTime,
-    overlay: { point: pluto, points: [pluto], hits, bodies: [{ ...BY_KEY.get('pluto'), key: 'pluto', longitude: pluto }] },
-    highlight: { houses: exactTime && mars.house ? [mars.house] : [], bodies: ['mars'] },
-  }));
+  const key = check.wheel_body;
+  const main = chart.positions.get(key);
+  const linked = [];
+  for (const item of check.indicators || []) {
+    const spec = item.when?.aspect;
+    if (!spec) continue;
+    const kinds = spec.aspects || ['conjunction', 'square', 'opposition', 'trine', 'sextile'];
+    for (const hit of chart.aspects || []) {
+      const other = hit.bodyA === key ? hit.bodyB : (hit.bodyB === key ? hit.bodyA : null);
+      if (other && [spec.b].flat().includes(other) && kinds.includes(hit.aspect.key) && !linked.includes(other)) {
+        linked.push(other);
+      }
+    }
+  }
+  const houses = exactTime && main?.house ? [main.house] : [];
+  node.append(renderWheel(chart, { exactTime, highlight: { houses, bodies: [key, ...linked] } }));
   const legend = element('p', 'sky-legend');
-  legend.append(element('b', null, 'Коралловым - твой Марс'), exactTime && mars.house ? ` и ${mars.house} дом` : '',
-    '. За кругом - где Плутон сегодня. ');
-  legend.append(touching ? 'Линия между ними - давление идет сейчас.' : 'Линии нет: сейчас он на твой Марс не давит.');
+  legend.append(element('b', null, `Коралловым - ${main.body.name}${houses.length ? ` и ${houses[0]} дом` : ''}`));
+  legend.append(linked.length
+    ? `, и планеты, с которыми он в напряжении: ${linked.map((k) => chart.positions.get(k).body.name).join(', ')}.`
+    : '. Напряженных аспектов из списка у него нет.');
   node.append(legend);
   return node;
 }
 
 function renderCheckWheel(chart, check, exactTime) {
   if (check.kind === 'crisis') return renderCrisisWheel(chart, exactTime);
-  if (check.kind === 'mars_pluto') return renderMarsWheel(chart, exactTime);
+  if (check.wheel_body) return renderBodyWheel(chart, check, exactTime);
   const node = card('Где это в твоей карте');
   const houses = exactTime ? check.houses || [] : [];
   const bodies = new Set();
