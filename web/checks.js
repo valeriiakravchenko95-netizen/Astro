@@ -246,7 +246,8 @@ const CONDITIONS = {
     if (a === b) return `у ${first} и ${second} дома один управитель - ${name(chart, a)}`;
     if (chart.positions.get(a)?.house === second) return `управитель ${first} дома в ${second} доме`;
     if (chart.positions.get(b)?.house === first) return `управитель ${second} дома в ${first} доме`;
-    const hit = chart.aspects.find((h) => (h.bodyA === a && h.bodyB === b) || (h.bodyA === b && h.bodyB === a));
+    const hit = chart.aspects.find((h) => ((h.bodyA === a && h.bodyB === b) || (h.bodyA === b && h.bodyB === a))
+      && (!spec.orb || h.orb <= spec.orb));
     if (hit) {
       return `управители ${first} и ${second} дома: ${name(chart, a)} ${hit.aspect.name.toLowerCase()} ${name(chart, b)}`;
     }
@@ -789,9 +790,12 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
   const summary = check.score === false
     ? (yes.length === 0 ? texts[`${check.key}.none`] : '')
     : texts[`${check.key}.${yes.length === 0 ? 'none' : (yes.length <= 2 ? 'few' : 'many')}`];
-  if (summary) node.append(...textNodes(summary));
+  // Сначала вступление, потом итог по списку. Без счета (туман) итог «ничего
+  // не совпало» идет после зоны и разделов: он ссылается на них как на то,
+  // что выше.
   const intro = texts[`${check.key}.intro`];
   if (intro) node.append(...textNodes(intro));
+  if (summary && check.score !== false) node.append(...textNodes(summary));
 
   // Путь по дому управителя (у денег - второго дома). Он есть у каждого,
   // поэтому и без совпадений из списка человек уходит со своим ответом.
@@ -901,6 +905,8 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     if (text) block.append(...textNodes(text));
     node.append(block);
   }
+
+  if (summary && check.score === false) node.append(...textNodes(summary));
 
   if (unknown.length) {
     node.append(element('p', 'note',
