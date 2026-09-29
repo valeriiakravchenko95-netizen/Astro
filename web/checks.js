@@ -44,7 +44,7 @@ export async function loadChecks() {
 export function flattenCheckTexts(full) {
   const flat = {};
   for (const check of full.checks || []) {
-    for (const field of ['intro', 'outro', 'none', 'few', 'many']) {
+    for (const field of ['intro', 'outro', 'none', 'none_notime', 'few', 'many']) {
       if (check[field]) flat[`${check.key}.${field}`] = check[field];
     }
     // Связь якоря с туманом: anchor_link.hard / anchor_link.soft.
@@ -124,7 +124,7 @@ export function neededCheckTexts(check, chart = null) {
     const position = chart?.positions.get(body);
     return position ? [ELEMENT[position.sign.index % 4]] : ELEMENT;
   };
-  const keys = ['intro', 'outro', 'none', 'few', 'many', 'notime'].map((field) => `${check.key}.${field}`);
+  const keys = ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'notime'].map((field) => `${check.key}.${field}`);
   for (const item of check.indicators || []) keys.push(`${check.key}.i.${item.id}`);
   if (check.kind === 'crisis') {
     for (const house of houses('uranus')) {
@@ -787,9 +787,12 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     node.append(score);
   }
 
+  // Ноль совпадений без времени рождения - не «ничего нет»: часть списка
+  // просто не проверить. Для этого случая свой текст, если он есть.
+  const zero = unknown.length && texts[`${check.key}.none_notime`] ? 'none_notime' : 'none';
   const summary = check.score === false
-    ? (yes.length === 0 ? texts[`${check.key}.none`] : '')
-    : texts[`${check.key}.${yes.length === 0 ? 'none' : (yes.length <= 2 ? 'few' : 'many')}`];
+    ? (yes.length === 0 ? texts[`${check.key}.${zero}`] : '')
+    : texts[`${check.key}.${yes.length === 0 ? zero : (yes.length <= 2 ? 'few' : 'many')}`];
   // Сначала вступление, потом итог по списку. Без счета (туман) итог «ничего
   // не совпало» идет после зоны и разделов: он ссылается на них как на то,
   // что выше.
