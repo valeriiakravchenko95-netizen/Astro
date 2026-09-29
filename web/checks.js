@@ -148,6 +148,7 @@ export function neededCheckTexts(check, chart = null) {
       for (const id of elements(check.anchor_of)) keys.push(`${check.key}.anchor_el.${id}`, `${check.key}.anchor_el.${id}.title`);
     }
     keys.push(`${check.key}.anchor_link.hard`, `${check.key}.anchor_link.soft`,
+      `${check.key}.anchor_link.rules`, `${check.key}.anchor_link.sign`,
       `${check.key}.anchor_same`, `${check.key}.anchor_same.title`);
   }
   return keys.map((key) => ['checks', key]);
@@ -887,6 +888,15 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
         ? `${position.body.name} в ${position.house} доме`
         : `${position.body.name} в ${SIGNS_IN[position.sign.index]}`));
       block.append(...textNodes(text));
+      // Якорь в знаке, которым управляет сама планета тумана: трезвость
+      // мягкая и держится на опоре снаружи.
+      const soft = check.zone_of && rulerOf(position.sign.index, chart.rulerScheme || TRADITIONAL) === check.zone_of
+        && texts[`${check.key}.anchor_link.sign`];
+      if (soft) {
+        // Без времени знак уже назван в первой строке блока.
+        if (byHouse) block.append(element('p', 'where', `${position.body.name} в ${SIGNS_IN[position.sign.index]}`));
+        block.append(...textNodes(soft));
+      }
       // Если якорь в аспекте с планетой тумана, это сказано отдельно.
       const hit = check.zone_of && chart.aspects.find((h) => h.orb <= 6
         && ((h.bodyA === check.anchor_of && h.bodyB === check.zone_of)
@@ -899,6 +909,15 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
         shown.push(label);
         block.append(element('p', 'where', label));
         block.append(...textNodes(link));
+      }
+      // Якорь управляет домом, где стоит туман: ключ к зоне - в сфере якоря.
+      // Частый случай: у рожденных с середины восьмидесятых до конца
+      // девяностых туман в знаке якоря, и дом с ним часто начинается там же.
+      const rules = byHouse && !same && zoneHouse && houseRuler(chart, zoneHouse) === check.anchor_of
+        && texts[`${check.key}.anchor_link.rules`];
+      if (rules) {
+        block.append(element('p', 'where', `${position.body.name} управляет ${zoneHouse} домом, где туман`));
+        block.append(...textNodes(rules));
       }
       node.append(block);
     }
