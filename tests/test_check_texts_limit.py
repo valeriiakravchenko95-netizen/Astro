@@ -19,9 +19,12 @@ import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const m = await import(pathToFileURL(process.argv[2]).href);
 const full = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const BODIES = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto'];
 const chart = (exactTime, house, sign) => ({
   exactTime,
-  positions: new Map(['uranus', 'neptune', 'saturn', 'mars'].map((b) => [b, { house, sign: { index: sign } }])),
+  houseSystem: 'placidus',
+  houses: new Map([['placidus', { cusps: Array.from({ length: 12 }, (_, i) => (i * 30 + sign * 30) % 360) }]]),
+  positions: new Map(BODIES.map((b) => [b, { house, sign: { index: sign } }])),
 });
 const out = {};
 for (const check of m.stripCheckTexts(full)) {

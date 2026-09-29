@@ -69,7 +69,7 @@ export function flattenCheckTexts(full) {
     for (const [wave, text] of Object.entries(check.wave || {})) flat[`${check.key}.wave.${wave}`] = text;
     // Ведущая манера по группам показателей, стиль по стихии, зона и якорь
     // по дому (якорь без времени - по стихии).
-    for (const field of ['group', 'element', 'zone', 'anchor', 'anchor_el']) {
+    for (const field of ['group', 'element', 'zone', 'anchor', 'anchor_el', 'path', 'path_el']) {
       for (const [id, item] of Object.entries(check[field] || {})) {
         flat[`${check.key}.${field}.${id}`] = item.text;
         flat[`${check.key}.${field}.${id}.title`] = item.title;
@@ -83,7 +83,8 @@ export function flattenCheckTexts(full) {
 // кодовое слово. Тексты - только с сервера.
 const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
   'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body',
-  'zone_of', 'groups_as', 'score', 'wheel_link', 'offer', 'anchor_of', 'more_label'];
+  'zone_of', 'groups_as', 'score', 'wheel_link', 'offer', 'anchor_of', 'more_label',
+  'path_ruler', 'path_fallback', 'path_label'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
@@ -140,6 +141,14 @@ export function neededCheckTexts(check, chart = null) {
   }
   if (check.zone_of) {
     for (const house of houses(check.zone_of)) keys.push(`${check.key}.zone.${house}`, `${check.key}.zone.${house}.title`);
+  }
+  if (check.path_ruler) {
+    let pathHouses = Array.from({ length: 12 }, (_, i) => i + 1);
+    if (chart) pathHouses = timed ? [chart.positions.get(houseRuler(chart, check.path_ruler))?.house].filter(Boolean) : [];
+    for (const house of pathHouses) keys.push(`${check.key}.path.${house}`, `${check.key}.path.${house}.title`);
+    if (check.path_fallback && (!chart || !pathHouses.length)) {
+      for (const id of elements(check.path_fallback)) keys.push(`${check.key}.path_el.${id}`, `${check.key}.path_el.${id}.title`);
+    }
   }
   if (check.anchor_of) {
     const anchorHouses = houses(check.anchor_of);
@@ -784,6 +793,38 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
   const intro = texts[`${check.key}.intro`];
   if (intro) node.append(...textNodes(intro));
 
+  // Путь по дому управителя (у денег - второго дома). Он есть у каждого,
+  // поэтому и без совпадений из списка человек уходит со своим ответом.
+  // Без времени рождения - по стихии запасной планеты (у денег - Венеры).
+  let pathWhere = '';
+  let pathTitle = '';
+  if (check.path_ruler) {
+    const ruler = chart.exactTime !== false ? houseRuler(chart, check.path_ruler) : null;
+    const position = ruler && chart.positions.get(ruler);
+    const fallback = !position?.house && check.path_fallback && chart.positions.get(check.path_fallback);
+    let key = '';
+    if (position?.house) {
+      key = `${check.key}.path.${position.house}`;
+      pathWhere = `управитель ${check.path_ruler} дома ${position.body.name} в ${position.house} доме`;
+    } else if (fallback) {
+      key = `${check.key}.path_el.${ELEMENT[fallback.sign.index % 4]}`;
+      pathWhere = `${fallback.body.name} в ${SIGNS_IN[fallback.sign.index]}`;
+    }
+    if (key && texts[key]) {
+      const block = element('div', 'reading path');
+      const title = texts[`${key}.title`];
+      const label = check.path_label || 'Твой путь';
+      // На картинке для сторис человек говорит о себе: «Мой путь к деньгам».
+      pathTitle = title ? `${label.replace(/^Твой/, 'Мой')}: ${title.toLowerCase()}` : '';
+      block.append(element('h3', null, title ? `${label}: ${title}` : label));
+      block.append(element('p', 'where', pathWhere));
+      block.append(...textNodes(texts[key]));
+      node.append(block);
+    } else {
+      pathWhere = '';
+    }
+  }
+
   // Зона по дому планеты (туман - дом Нептуна).
   if (check.zone_of) {
     const position = chart.positions.get(check.zone_of);
@@ -923,6 +964,7 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     }
   }
 
+  if (pathWhere) shown.push(pathWhere);
   const zone = check.zone_of && chart.positions.get(check.zone_of);
   if (zone?.house && chart.exactTime !== false) shown.push(`${zone.body.name} в ${zone.house} доме`);
   const places = morePlaces(chart, check, shown);
@@ -970,7 +1012,8 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     title: check.share || check.title,
     big: big || '·',
     small: big ? small : 'моя карта',
-    lines: yes.map((r) => r.item.title),
+    // Без совпадений на картинке для сторис - свой путь, а не пустота.
+    lines: yes.length ? yes.map((r) => r.item.title) : [pathTitle].filter(Boolean),
     link: `${location.host}${check.slug ? `/${check.slug}` : `/?check=${check.key}`}`,
     nick,
   }, holder));
