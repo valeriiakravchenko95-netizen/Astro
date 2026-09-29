@@ -388,7 +388,7 @@ function render(chart, exactTime) {
     }));
     const offer = check.code_word ? null : renderOffer(check.offer || 'readings');
     if (offer) result.append(offer);
-    const more = element('button', 'more', 'Показать мою карту');
+    const more = element('button', 'more', 'Что еще в небе заденет тебя');
     more.type = 'button';
     target = element('div');
     target.hidden = true;
@@ -407,7 +407,9 @@ function render(chart, exactTime) {
   const { name } = label(chosenPlace);
   const local = chart.moment;
   const head = card();
-  if (eventFirst) head.classList.add('compact');
+  // По ссылке события или проверки колесо уже стоит выше: здесь только
+  // строка с данными рождения, без заголовка «Твоя карта».
+  if (eventFirst || check) head.classList.add('compact');
   else head.append(element('h2', null, 'Твоя карта'));
   head.append(element('p', 'note',
     `${name} · ${dateInput.value.split('-').reverse().join('.')}`
