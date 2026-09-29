@@ -386,6 +386,9 @@ function render(chart, exactTime) {
     result.append(renderCheck(chart, check, {
       dmUrl: siteSettings().dm_url, nick: instagramNick(), ephemeris,
     }));
+    // Сразу после разбора - подписка: следующие темы будут в новых рилсах.
+    const follow = renderOffer('follow');
+    if (follow) result.append(follow);
     const offer = check.code_word ? null : renderOffer(check.offer || 'readings');
     if (offer) result.append(offer);
     const more = element('button', 'more', 'Что еще в небе заденет тебя');
@@ -446,6 +449,8 @@ function render(chart, exactTime) {
     if (focused) {
       const transits = renderTransits(chart, { exactTime, focus: true, skyAt });
       if (transits) target.append(transits);
+      const follow = renderOffer('follow');
+      if (follow) target.append(follow);
       if (skyOffer) target.append(skyOffer);
     }
     const upcoming = renderUpcoming(chart, { exactTime, exclude: shown });

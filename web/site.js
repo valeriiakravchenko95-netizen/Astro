@@ -62,7 +62,7 @@ export function renderOffer(key) {
   const offer = site.offers?.[key];
   if (!offer?.text) return null;
   const node = document.createElement('section');
-  node.className = 'card offer';
+  node.className = `card offer offer-${key}`;
   node.append(...textNodes(offer.text));
   if (offer.url) {
     const link = document.createElement('a');
