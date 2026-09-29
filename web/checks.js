@@ -61,8 +61,8 @@ export function flattenCheckTexts(full) {
       flat[`${check.key}.flavor.${body}.title`] = item.title;
     }
     for (const [wave, text] of Object.entries(check.wave || {})) flat[`${check.key}.wave.${wave}`] = text;
-    // Ведущая манера по группам показателей и стиль по стихии Марса.
-    for (const field of ['group', 'element']) {
+    // Ведущая манера по группам показателей, стиль по стихии, зона по дому.
+    for (const field of ['group', 'element', 'zone']) {
       for (const [id, item] of Object.entries(check[field] || {})) {
         flat[`${check.key}.${field}.${id}`] = item.text;
         flat[`${check.key}.${field}.${id}.title`] = item.title;
@@ -75,7 +75,8 @@ export function flattenCheckTexts(full) {
 // Что из проверки можно отдать странице заранее: условия, заголовки,
 // кодовое слово. Тексты - только с сервера.
 const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
-  'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body'];
+  'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body',
+  'zone_of', 'groups_as', 'score', 'wheel_link'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
@@ -115,6 +116,9 @@ export function neededCheckTexts(check) {
   }
   if (check.element_of) {
     for (const id of ELEMENT) keys.push(`${check.key}.element.${id}`, `${check.key}.element.${id}.title`);
+  }
+  if (check.zone_of) {
+    for (let house = 1; house <= 12; house += 1) keys.push(`${check.key}.zone.${house}`, `${check.key}.zone.${house}.title`);
   }
   return keys.map((key) => ['checks', key]);
 }
@@ -693,20 +697,40 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     big = String(yes.length);
     small = `${plural(yes.length, 'показатель', 'показателя', 'показателей')} в твоей карте`;
   }
-  if (big) {
+  if (big && check.score !== false) {
     const score = element('p', 'score');
     score.append(element('strong', null, big), document.createTextNode(small));
     node.append(score);
   }
 
-  const summary = texts[`${check.key}.${yes.length === 0 ? 'none' : (yes.length <= 2 ? 'few' : 'many')}`];
+  const summary = check.score === false
+    ? (yes.length === 0 ? texts[`${check.key}.none`] : '')
+    : texts[`${check.key}.${yes.length === 0 ? 'none' : (yes.length <= 2 ? 'few' : 'many')}`];
   if (summary) node.append(...textNodes(summary));
   const intro = texts[`${check.key}.intro`];
   if (intro) node.append(...textNodes(intro));
 
+  // Зона по дому планеты (туман - дом Нептуна).
+  if (check.zone_of) {
+    const position = chart.positions.get(check.zone_of);
+    if (chart.exactTime !== false && position?.house && texts[`${check.key}.zone.${position.house}`]) {
+      const block = element('div', 'reading hit');
+      const title = texts[`${check.key}.zone.${position.house}.title`];
+      block.append(element('h3', null, title ? `Твоя зона: ${title}` : 'Твоя зона'));
+      block.append(element('p', 'where', `${position.body.name} в ${position.house} доме`));
+      block.append(...textNodes(texts[`${check.key}.zone.${position.house}`]));
+      node.append(block);
+    } else if (texts[`${check.key}.notime`]) {
+      node.append(element('div', 'warn', inGender(texts[`${check.key}.notime`])));
+    }
+  }
+
+  // Показатели разделами (дар, любовь, деньги) - вместо ведущей манеры.
+  const sections = check.groups_as === 'sections';
+
   // Ведущая манера: группа, в которой больше всего совпадений.
   const groups = new Map();
-  for (const { item } of yes) if (item.group) groups.set(item.group, (groups.get(item.group) || 0) + 1);
+  if (!sections) for (const { item } of yes) if (item.group) groups.set(item.group, (groups.get(item.group) || 0) + 1);
   // Ведущая - группа с наибольшей долей совпавших показателей: в группах
   // разное число показателей, и простой счет тянул бы к самой большой.
   const sizes = new Map();
@@ -741,7 +765,20 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     }
   }
 
-  for (const { item, because } of yes) {
+  let currentGroup = null;
+  const ordered = sections
+    ? [...yes].sort((a, b) => (check.indicators.findIndex((i) => i.group === a.item.group)
+      - check.indicators.findIndex((i) => i.group === b.item.group)))
+    : yes;
+  for (const { item, because } of ordered) {
+    if (sections && item.group !== currentGroup) {
+      currentGroup = item.group;
+      const head = element('div', 'section-head');
+      head.append(element('h3', null, texts[`${check.key}.group.${item.group}.title`] || ''));
+      const about = texts[`${check.key}.group.${item.group}`];
+      if (about) head.append(...textNodes(about));
+      node.append(head);
+    }
     const block = element('div', 'reading hit');
     block.append(element('h3', null, item.title));
     block.append(element('p', 'where', because));

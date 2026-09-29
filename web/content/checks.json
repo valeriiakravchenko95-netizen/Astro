@@ -579,6 +579,253 @@
      "text": "Где тебя задели, замечаешь мгновенно, даже если снаружи никто ничего не видел. Сначала приходит обида, злость - позже, и ее легко не узнать: она прячется за «да ничего, все нормально». Копится тихо, а выходит слезами или холодом, когда отдаляешься и перестаешь отвечать.\n\nТакой злости нужно имя. Скажи себе, а потом человеку: «я злюсь, потому что...» - и чувство становится меньше. Помогает и вода: бассейн, долгий душ, прогулка у реки."
     }
    }
+  },
+  {
+   "key": "fog",
+   "slug": "tuman",
+   "title": "Туман в твоей карте",
+   "heading": "Где твой туман",
+   "heading_em": "по твоей карте",
+   "lead": "Где ты идеализируешь, не замечаешь и веришь на слово - в любви и в деньгах, и как не попасть в ловушку. Расчет идет в твоем браузере: дата и место рождения никуда не отправляются.",
+   "description": "Проверь по своей натальной карте, где твоя зона тумана в любви и деньгах и как не попасть в ловушку.",
+   "code_word": "ТУМАН",
+   "share": "Мой туман по карте",
+   "zone_of": "neptune",
+   "wheel_body": "neptune",
+   "wheel_link": "связан",
+   "groups_as": "sections",
+   "score": false,
+   "houses": [],
+   "indicators": [
+    {
+     "id": "gift_sun",
+     "group": "gift",
+     "title": "Нептун в гармонии с Солнцем",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "sun",
+       "aspects": [
+        "trine",
+        "sextile"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "gift_moon",
+     "group": "gift",
+     "title": "Нептун в гармонии с Луной",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "moon",
+       "aspects": [
+        "trine",
+        "sextile"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "gift_venus",
+     "group": "gift",
+     "title": "Нептун в гармонии с Венерой",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "venus",
+       "aspects": [
+        "trine",
+        "sextile"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "gift_mercury",
+     "group": "gift",
+     "title": "Нептун в гармонии с Меркурием",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "mercury",
+       "aspects": [
+        "trine",
+        "sextile"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "love_venus",
+     "group": "love",
+     "title": "Нептун и Венера в напряжении",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "venus",
+       "aspects": [
+        "conjunction",
+        "square",
+        "opposition"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "love_moon",
+     "group": "love",
+     "title": "Нептун и Луна в напряжении",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "moon",
+       "aspects": [
+        "conjunction",
+        "square",
+        "opposition"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "love_sun",
+     "group": "love",
+     "title": "Нептун и Солнце в напряжении",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "sun",
+       "aspects": [
+        "conjunction",
+        "square",
+        "opposition"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "love_fifth",
+     "group": "love",
+     "title": "Нептун в 5 доме",
+     "when": {
+      "planet_in_house": {
+       "bodies": "neptune",
+       "houses": [
+        5
+       ]
+      }
+     }
+    },
+    {
+     "id": "love_seventh",
+     "group": "love",
+     "title": "Нептун в 7 доме",
+     "when": {
+      "planet_in_house": {
+       "bodies": "neptune",
+       "houses": [
+        7
+       ]
+      }
+     }
+    },
+    {
+     "id": "love_venus_pisces",
+     "group": "love",
+     "title": "Венера в Рыбах или в 12 доме",
+     "when": {
+      "any": [
+       {
+        "planet_in_sign": {
+         "bodies": "venus",
+         "signs": [
+          11
+         ]
+        }
+       },
+       {
+        "planet_in_house": {
+         "bodies": "venus",
+         "houses": [
+          12
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "id": "money_house",
+     "group": "money",
+     "title": "Нептун во 2 или 8 доме",
+     "when": {
+      "planet_in_house": {
+       "bodies": "neptune",
+       "houses": [
+        2,
+        8
+       ]
+      }
+     }
+    },
+    {
+     "id": "money_jupiter",
+     "group": "money",
+     "title": "Нептун и Юпитер в напряжении",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "jupiter",
+       "aspects": [
+        "conjunction",
+        "square",
+        "opposition"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "money_mercury",
+     "group": "money",
+     "title": "Нептун и Меркурий в напряжении",
+     "when": {
+      "aspect": {
+       "a": "neptune",
+       "b": "mercury",
+       "aspects": [
+        "conjunction",
+        "square",
+        "opposition"
+       ],
+       "orb": 6
+      }
+     }
+    },
+    {
+     "id": "money_ruler",
+     "group": "money",
+     "title": "Управитель 2 дома в 12 доме",
+     "when": {
+      "ruler_in_house": {
+       "house": 2,
+       "houses": [
+        12
+       ]
+      }
+     }
+    }
+   ],
+   "none": "Из списка аспектов и положений ничего не совпало: особого нажима тумана в твоей карте нет. Главное о нем - в твоей зоне выше, а как он складывается со всей картой, видно в разборе."
   }
  ]
 }

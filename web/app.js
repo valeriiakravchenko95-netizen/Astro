@@ -333,8 +333,8 @@ function renderBodyWheel(chart, check, exactTime) {
   const legend = element('p', 'sky-legend');
   legend.append(element('b', null, `Коралловым - ${main.body.name}${houses.length ? ` и ${houses[0]} дом` : ''}`));
   legend.append(linked.length
-    ? `, и планеты, с которыми он в напряжении: ${linked.map((k) => chart.positions.get(k).body.name).join(', ')}.`
-    : '. Напряженных аспектов из списка у него нет.');
+    ? `, и планеты, с которыми он ${check.wheel_link || 'в напряжении'}: ${linked.map((k) => chart.positions.get(k).body.name).join(', ')}.`
+    : '. Аспектов из списка у него нет.');
   node.append(legend);
   return node;
 }

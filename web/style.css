@@ -349,3 +349,6 @@ header.landing h1 { font-size: 40px; }
 .later li:last-child { border-bottom: 1px solid var(--line); }
 .later .date { color: var(--accent-ink); font-variant-numeric: lining-nums tabular-nums; }
 .check-card .reading h3:not(:first-child) { margin-top: 22px; }
+.check-card .section-head { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); }
+.check-card .section-head h3 { font: 400 24px/1.2 var(--serif); margin: 0 0 8px; }
+.check-card .section-head p { color: var(--muted); }
