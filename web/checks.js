@@ -49,6 +49,10 @@ export function flattenCheckTexts(full) {
     }
     // Связь якоря с туманом: anchor_link.hard / anchor_link.soft.
     for (const [id, text] of Object.entries(check.anchor_link || {})) flat[`${check.key}.anchor_link.${id}`] = text;
+    if (check.anchor_same) {
+      flat[`${check.key}.anchor_same`] = check.anchor_same.text;
+      flat[`${check.key}.anchor_same.title`] = check.anchor_same.title;
+    }
     for (const item of check.indicators || []) {
       if (item.text) flat[`${check.key}.i.${item.id}`] = item.text;
     }
@@ -143,7 +147,8 @@ export function neededCheckTexts(check, chart = null) {
     if (!chart || !anchorHouses.length) {
       for (const id of elements(check.anchor_of)) keys.push(`${check.key}.anchor_el.${id}`, `${check.key}.anchor_el.${id}.title`);
     }
-    keys.push(`${check.key}.anchor_link.hard`, `${check.key}.anchor_link.soft`);
+    keys.push(`${check.key}.anchor_link.hard`, `${check.key}.anchor_link.soft`,
+      `${check.key}.anchor_same`, `${check.key}.anchor_same.title`);
   }
   return keys.map((key) => ['checks', key]);
 }
@@ -244,6 +249,15 @@ const CONDITIONS = {
     const inside = bodies.filter((body) => list(spec.houses).includes(chart.positions.get(body)?.house));
     if (inside.length >= (spec.min || 1)) {
       return `${inside.map((body) => name(chart, body)).join(', ')} в ${list(spec.houses).join(', ')} домах`;
+    }
+    return null;
+  },
+
+  // Планета управляет одним из домов (по знаку на куспиде).
+  house_ruler(chart, spec) {
+    if (!chart.exactTime) return NEED_TIME;
+    for (const house of list(spec.houses)) {
+      if (houseRuler(chart, house) === spec.body) return `${name(chart, spec.body)} управляет ${house} домом`;
     }
     return null;
   },
@@ -858,12 +872,16 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
   if (check.anchor_of) {
     const position = chart.positions.get(check.anchor_of);
     const byHouse = chart.exactTime !== false && position?.house;
+    // Якорь в том же доме, что и зона тумана: трезвость и туман делят одну
+    // сферу, и текст по дому якоря спорил бы с текстом зоны.
+    const zoneHouse = check.zone_of && chart.positions.get(check.zone_of)?.house;
+    const same = byHouse && zoneHouse === position.house && texts[`${check.key}.anchor_same`];
     const field = byHouse ? 'anchor' : 'anchor_el';
     const id = position && (byHouse ? position.house : ELEMENT[position.sign.index % 4]);
-    const text = id && texts[`${check.key}.${field}.${id}`];
+    const text = same || (id && texts[`${check.key}.${field}.${id}`]);
     if (text) {
       const block = element('div', 'reading anchor');
-      const title = texts[`${check.key}.${field}.${id}.title`];
+      const title = same ? texts[`${check.key}.anchor_same.title`] : texts[`${check.key}.${field}.${id}.title`];
       block.append(element('h3', null, title ? `Твой якорь: ${title}` : 'Твой якорь'));
       block.append(element('p', 'where', byHouse
         ? `${position.body.name} в ${position.house} доме`
@@ -874,7 +892,8 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
         && ((h.bodyA === check.anchor_of && h.bodyB === check.zone_of)
           || (h.bodyB === check.anchor_of && h.bodyA === check.zone_of)));
       const kind = hit && (['trine', 'sextile'].includes(hit.aspect.key) ? 'soft' : 'hard');
-      const link = kind && texts[`${check.key}.anchor_link.${kind}`];
+      // В одном доме со сцепкой текст про сцепку повторял бы общий.
+      const link = kind && !(same && kind === 'hard') && texts[`${check.key}.anchor_link.${kind}`];
       if (link) {
         const label = `${name(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${name(chart, hit.bodyB)}`;
         shown.push(label);
