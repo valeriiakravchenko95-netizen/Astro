@@ -76,7 +76,7 @@ export function flattenCheckTexts(full) {
 // кодовое слово. Тексты - только с сервера.
 const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
   'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body',
-  'zone_of', 'groups_as', 'score', 'wheel_link'];
+  'zone_of', 'groups_as', 'score', 'wheel_link', 'offer'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
@@ -681,7 +681,7 @@ const ELEMENT = ['fire', 'earth', 'air', 'water'];
 
 export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = null } = {}) {
   if (check.kind === 'crisis') return renderCrisis(chart, check, { dmUrl, nick, ephemeris });
-  const { results, yes, no, unknown } = runCheck(chart, check);
+  const { results, yes, unknown } = runCheck(chart, check);
   const node = element('section', 'card check-card');
   node.append(element('h2', null, check.title));
 
@@ -785,15 +785,6 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     const text = texts[`${check.key}.i.${item.id}`];
     if (text) block.append(...textNodes(text));
     node.append(block);
-  }
-
-  if (no.length) {
-    const rest = element('div', 'rest');
-    rest.append(element('h3', null, 'Остальные показатели из списка'));
-    const items = element('ul');
-    for (const { item } of no) items.append(element('li', null, item.title));
-    rest.append(items);
-    node.append(rest);
   }
 
   if (unknown.length) {

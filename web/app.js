@@ -386,7 +386,7 @@ function render(chart, exactTime) {
     result.append(renderCheck(chart, check, {
       dmUrl: siteSettings().dm_url, nick: instagramNick(), ephemeris,
     }));
-    const offer = check.code_word ? null : renderOffer('readings');
+    const offer = check.code_word ? null : renderOffer(check.offer || 'readings');
     if (offer) result.append(offer);
     const more = element('button', 'more', 'Показать мою карту');
     more.type = 'button';
