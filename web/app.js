@@ -187,7 +187,7 @@ async function fetchTexts(chart, exactTime) {
     : {
       natal: fromReel() ? [] : neededTexts(chart, exactTime),
       sky: neededSkyTexts(chart, exactTime),
-      checks: neededCheckTexts(askedCheck()),
+      checks: neededCheckTexts(askedCheck(), chart),
     };
   const response = await fetch('api/texts', {
     method: 'POST',

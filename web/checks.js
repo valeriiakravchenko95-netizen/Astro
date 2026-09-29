@@ -47,6 +47,8 @@ export function flattenCheckTexts(full) {
     for (const field of ['intro', 'outro', 'none', 'few', 'many']) {
       if (check[field]) flat[`${check.key}.${field}`] = check[field];
     }
+    // Связь якоря с туманом: anchor_link.hard / anchor_link.soft.
+    for (const [id, text] of Object.entries(check.anchor_link || {})) flat[`${check.key}.anchor_link.${id}`] = text;
     for (const item of check.indicators || []) {
       if (item.text) flat[`${check.key}.i.${item.id}`] = item.text;
     }
@@ -61,8 +63,9 @@ export function flattenCheckTexts(full) {
       flat[`${check.key}.flavor.${body}.title`] = item.title;
     }
     for (const [wave, text] of Object.entries(check.wave || {})) flat[`${check.key}.wave.${wave}`] = text;
-    // Ведущая манера по группам показателей, стиль по стихии, зона по дому.
-    for (const field of ['group', 'element', 'zone']) {
+    // Ведущая манера по группам показателей, стиль по стихии, зона и якорь
+    // по дому (якорь без времени - по стихии).
+    for (const field of ['group', 'element', 'zone', 'anchor', 'anchor_el']) {
       for (const [id, item] of Object.entries(check[field] || {})) {
         flat[`${check.key}.${field}.${id}`] = item.text;
         flat[`${check.key}.${field}.${id}.title`] = item.title;
@@ -76,7 +79,7 @@ export function flattenCheckTexts(full) {
 // кодовое слово. Тексты - только с сервера.
 const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
   'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body',
-  'zone_of', 'groups_as', 'score', 'wheel_link', 'offer'];
+  'zone_of', 'groups_as', 'score', 'wheel_link', 'offer', 'anchor_of', 'more_label'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
@@ -100,12 +103,26 @@ export function askedCheck() {
     || null;
 }
 
-export function neededCheckTexts(check) {
+// С картой - только варианты, которые ей выпадут (дом, стихия): сервер отдает
+// не больше сорока текстов проверки за запрос, а все варианты по двенадцати
+// домам в этот предел не помещаются.
+export function neededCheckTexts(check, chart = null) {
   if (!check) return [];
+  const timed = !chart || chart.exactTime !== false;
+  const houseOf = (body) => (chart ? (timed ? chart.positions.get(body)?.house : null) : undefined);
+  const houses = (body) => {
+    const house = houseOf(body);
+    if (house === undefined) return Array.from({ length: 12 }, (_, i) => i + 1);
+    return house ? [house] : [];
+  };
+  const elements = (body) => {
+    const position = chart?.positions.get(body);
+    return position ? [ELEMENT[position.sign.index % 4]] : ELEMENT;
+  };
   const keys = ['intro', 'outro', 'none', 'few', 'many', 'notime'].map((field) => `${check.key}.${field}`);
   for (const item of check.indicators || []) keys.push(`${check.key}.i.${item.id}`);
   if (check.kind === 'crisis') {
-    for (let house = 1; house <= 12; house += 1) {
+    for (const house of houses('uranus')) {
       keys.push(`${check.key}.house.${house}`, `${check.key}.house.${house}.title`);
     }
     for (const body of CRISIS_FLAVOR) keys.push(`${check.key}.flavor.${body}`, `${check.key}.flavor.${body}.title`);
@@ -115,10 +132,18 @@ export function neededCheckTexts(check) {
     keys.push(`${check.key}.group.${id}`, `${check.key}.group.${id}.title`);
   }
   if (check.element_of) {
-    for (const id of ELEMENT) keys.push(`${check.key}.element.${id}`, `${check.key}.element.${id}.title`);
+    for (const id of elements(check.element_of)) keys.push(`${check.key}.element.${id}`, `${check.key}.element.${id}.title`);
   }
   if (check.zone_of) {
-    for (let house = 1; house <= 12; house += 1) keys.push(`${check.key}.zone.${house}`, `${check.key}.zone.${house}.title`);
+    for (const house of houses(check.zone_of)) keys.push(`${check.key}.zone.${house}`, `${check.key}.zone.${house}.title`);
+  }
+  if (check.anchor_of) {
+    const anchorHouses = houses(check.anchor_of);
+    for (const house of anchorHouses) keys.push(`${check.key}.anchor.${house}`, `${check.key}.anchor.${house}.title`);
+    if (!chart || !anchorHouses.length) {
+      for (const id of elements(check.anchor_of)) keys.push(`${check.key}.anchor_el.${id}`, `${check.key}.anchor_el.${id}.title`);
+    }
+    keys.push(`${check.key}.anchor_link.hard`, `${check.key}.anchor_link.soft`);
   }
   return keys.map((key) => ['checks', key]);
 }
@@ -314,7 +339,8 @@ function plural(count, one, few, many) {
 // значат и как связаны между собой, остается для консультации.
 
 function morePlaces(chart, check, already) {
-  if (!chart.exactTime || !check.more) return [];
+  if (!check.more) return [];
+  const timed = Boolean(chart.exactTime);
   const found = [];
   // Место, уже названное среди найденных показателей, второй раз не идет:
   // сверяем по «планета в доме», в каком бы обороте оно ни стояло.
@@ -324,7 +350,7 @@ function morePlaces(chart, check, already) {
     if (!seen(planetInHouse)) found.push(label);
   };
   for (const spec of check.more) {
-    if (spec.ruler) {
+    if (spec.ruler && timed) {
       const ruler = houseRuler(chart, spec.ruler);
       const position = chart.positions.get(ruler);
       if (position) {
@@ -332,20 +358,53 @@ function morePlaces(chart, check, already) {
         add(`управитель ${spec.ruler} дома ${place}`, place);
       }
     }
-    if (spec.planets_in) {
-      for (const body of [...PLANETS, 'true_node']) {
+    if (spec.planets_in && timed) {
+      for (const body of list(spec.bodies || [...PLANETS, 'true_node'])) {
         const position = chart.positions.get(body);
         if (position && list(spec.planets_in).includes(position.house)) {
           add(`${position.body.name} в ${position.house} доме`);
         }
       }
     }
-    if (spec.ruler_aspects) {
+    if (spec.ruler_aspects && timed) {
       const ruler = houseRuler(chart, spec.ruler_aspects);
       for (const hit of chart.aspects) {
         if (hit.bodyA !== ruler && hit.bodyB !== ruler) continue;
         if (!PLANETS.includes(hit.bodyA) || !PLANETS.includes(hit.bodyB)) continue;
         add(`${name(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${name(chart, hit.bodyB)}`);
+      }
+    }
+    // Дома, которыми управляет планета (у тумана - дома, где начинаются Рыбы).
+    if (spec.rules_of && timed) {
+      for (let house = 1; house <= 12; house += 1) {
+        if (houseRuler(chart, house) === spec.rules_of) add(`${name(chart, spec.rules_of)} управляет ${house} домом`);
+      }
+    }
+    // Планета у любого из четырех углов.
+    if (spec.on_angles && timed) {
+      const position = chart.positions.get(spec.on_angles);
+      const angles = [['Асцендентом', chart.angles.asc], ['МС', chart.angles.mc],
+        ['Десцендентом', chart.angles.asc + 180], ['IC', chart.angles.mc + 180]];
+      for (const [label, longitude] of angles) {
+        if (position && Math.abs(norm180(position.longitude - longitude)) <= (spec.orb ?? 6)) {
+          add(`${position.body.name} рядом с ${label}`);
+        }
+      }
+    }
+    // Аспекты планеты к остальным, кроме перечисленных в skip.
+    if (spec.aspects_of) {
+      for (const hit of chart.aspects) {
+        const other = hit.bodyA === spec.aspects_of ? hit.bodyB : (hit.bodyB === spec.aspects_of ? hit.bodyA : null);
+        if (!other || !PLANETS.includes(other) || list(spec.skip || []).includes(other)) continue;
+        add(`${name(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${name(chart, hit.bodyB)}`);
+      }
+    }
+    if (spec.in_signs) {
+      for (const body of list(spec.bodies || PLANETS)) {
+        const position = chart.positions.get(body);
+        if (position && list(spec.in_signs).includes(position.sign.index)) {
+          add(`${position.body.name} в ${SIGNS_IN[position.sign.index]}`);
+        }
       }
     }
   }
@@ -793,11 +852,47 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
       + 'зависят от времени рождения - без него их не проверить.'));
   }
 
-  const places = morePlaces(chart, check, yes.map((r) => r.because));
+  const shown = yes.map((r) => r.because);
+  // Якорь: где в карте ясный взгляд, которым можно сверять туман. По дому
+  // планеты, без времени рождения - по стихии ее знака.
+  if (check.anchor_of) {
+    const position = chart.positions.get(check.anchor_of);
+    const byHouse = chart.exactTime !== false && position?.house;
+    const field = byHouse ? 'anchor' : 'anchor_el';
+    const id = position && (byHouse ? position.house : ELEMENT[position.sign.index % 4]);
+    const text = id && texts[`${check.key}.${field}.${id}`];
+    if (text) {
+      const block = element('div', 'reading anchor');
+      const title = texts[`${check.key}.${field}.${id}.title`];
+      block.append(element('h3', null, title ? `Твой якорь: ${title}` : 'Твой якорь'));
+      block.append(element('p', 'where', byHouse
+        ? `${position.body.name} в ${position.house} доме`
+        : `${position.body.name} в ${SIGNS_IN[position.sign.index]}`));
+      block.append(...textNodes(text));
+      // Если якорь в аспекте с планетой тумана, это сказано отдельно.
+      const hit = check.zone_of && chart.aspects.find((h) => h.orb <= 6
+        && ((h.bodyA === check.anchor_of && h.bodyB === check.zone_of)
+          || (h.bodyB === check.anchor_of && h.bodyA === check.zone_of)));
+      const kind = hit && (['trine', 'sextile'].includes(hit.aspect.key) ? 'soft' : 'hard');
+      const link = kind && texts[`${check.key}.anchor_link.${kind}`];
+      if (link) {
+        const label = `${name(chart, hit.bodyA)} ${hit.aspect.name.toLowerCase()} ${name(chart, hit.bodyB)}`;
+        shown.push(label);
+        block.append(element('p', 'where', label));
+        block.append(...textNodes(link));
+      }
+      node.append(block);
+    }
+  }
+
+  const zone = check.zone_of && chart.positions.get(check.zone_of);
+  if (zone?.house && chart.exactTime !== false) shown.push(`${zone.body.name} в ${zone.house} доме`);
+  const places = morePlaces(chart, check, shown);
   if (places.length) {
     const box = element('div', 'more-places');
     box.append(element('h3', null,
-      `Еще ${places.length} ${plural(places.length, 'место', 'места', 'мест')} в твоей карте влияют на эту тему`));
+      `Еще ${places.length} ${plural(places.length, 'место', 'места', 'мест')} в твоей карте`
+      + `${check.more_label || ' влияют на эту тему'}`));
     const items = element('ul');
     for (const label of places) items.append(element('li', null, label));
     box.append(items);

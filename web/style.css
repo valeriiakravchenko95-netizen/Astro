@@ -193,6 +193,7 @@ tr:last-child td { border-bottom: 0; }
 .reading { padding: 18px 0; border-top: 1px solid var(--line); }
 .reading:first-child { border-top: 0; padding-top: 0; }
 .reading h3 { font: 600 21px/1.2 var(--serif); margin: 0 0 4px; }
+.reading p + .where { margin-top: 20px; }
 .reading .where {
   font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
   color: var(--accent-ink); margin: 0 0 10px;
