@@ -347,6 +347,8 @@ header.landing h1 { font-size: 40px; }
 .upcoming .date { grid-row: 1 / span 3; }
 .upcoming .what, .upcoming .touch, .upcoming .themes-line { grid-column: 2; }
 .upcoming .themes-line { color: var(--accent-ink); font-size: 13px; }
+/* В волнах кризиса под заголовком целый абзац - читается обычным текстом. */
+.waves .themes-line { display: block; margin-top: 6px; color: var(--text); font-size: 15px; line-height: 1.55; }
 .later { list-style: none; margin: 14px 0 0; padding: 0; }
 .later li { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
 .later li:last-child { border-bottom: 1px solid var(--line); }

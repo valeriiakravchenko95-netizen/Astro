@@ -586,13 +586,13 @@ const CRISIS_ASPECTS = new Set(['conjunction', 'opposition', 'square', 'trine', 
 // usual - обычный возраст для поколений 1975-1995, если дата за пределами
 // таблиц (у Плутона он зависит от года рождения, поэтому его нет).
 const WAVES = [
-  { key: 'nodes_return', body: 'true_node', angle: 0, from: 34, to: 40, usual: 37, title: 'Второе возвращение узлов' },
-  { key: 'saturn_square', body: 'saturn', angle: 90, from: 34, to: 40, usual: 37, title: 'Сатурн в квадрате к себе' },
-  { key: 'pluto_square', body: 'pluto', angle: 90, from: 30, to: 55, usual: null, title: 'Плутон в квадрате к себе' },
-  { key: 'neptune_square', body: 'neptune', angle: 90, from: 36, to: 45, usual: 40, title: 'Нептун в квадрате к себе' },
-  { key: 'uranus_opposition', body: 'uranus', angle: 180, from: 38, to: 48, usual: 43, title: 'Уран напротив себя' },
-  { key: 'saturn_opposition', body: 'saturn', angle: 180, from: 41, to: 47, usual: 44, title: 'Сатурн напротив себя' },
-  { key: 'nodes_inversion', body: 'true_node', angle: 180, from: 44, to: 49, usual: 46, title: 'Инверсия узлов' },
+  { key: 'nodes_return', body: 'true_node', angle: 0, from: 34, to: 40, usual: 37, title: 'Второе возвращение узлов', plain: 'Куда я иду' },
+  { key: 'saturn_square', body: 'saturn', angle: 90, from: 34, to: 40, usual: 37, title: 'Сатурн в квадрате к себе', plain: 'Проверка на прочность' },
+  { key: 'pluto_square', body: 'pluto', angle: 90, from: 30, to: 55, usual: null, title: 'Плутон в квадрате к себе', plain: 'Глубокая перестройка' },
+  { key: 'neptune_square', body: 'neptune', angle: 90, from: 36, to: 45, usual: 40, title: 'Нептун в квадрате к себе', plain: 'Поиск смысла' },
+  { key: 'uranus_opposition', body: 'uranus', angle: 180, from: 38, to: 48, usual: 43, title: 'Уран напротив себя', plain: 'Бунт и свобода' },
+  { key: 'saturn_opposition', body: 'saturn', angle: 180, from: 41, to: 47, usual: 44, title: 'Сатурн напротив себя', plain: 'Время итогов' },
+  { key: 'nodes_inversion', body: 'true_node', angle: 180, from: 44, to: 49, usual: 46, title: 'Инверсия узлов', plain: 'Что держит на месте' },
 ];
 
 const YEAR = 365.25;
@@ -713,8 +713,9 @@ function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } 
       const item = element('li');
       const line = element('div', 'item');
       line.append(element('span', 'date', row.age === null ? '·' : `${row.approx ? 'около ' : ''}${row.age}`));
-      line.append(element('span', 'what', row.wave.title));
-      line.append(element('span', 'touch', row.when));
+      // Заголовок простыми словами, астрология - мелкой строкой с датами.
+      line.append(element('span', 'what', row.wave.plain || row.wave.title));
+      line.append(element('span', 'touch', `${row.wave.title} · ${row.when}`));
       const text = texts[`${check.key}.wave.${row.wave.key}`];
       if (text) {
         const about = element('span', 'themes-line');
@@ -752,7 +753,7 @@ function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } 
     title: check.share || check.title,
     big: bunt?.age ? `${bunt.age}` : '·',
     small: bunt?.age ? 'лет - мой бунт' : 'моя карта',
-    lines: [typeTitle, ...rows.filter((row) => row.age).slice(0, 4).map((row) => `${row.age} - ${row.wave.title}`)]
+    lines: [typeTitle, ...rows.filter((row) => row.age).slice(0, 4).map((row) => `${row.age} - ${row.wave.plain || row.wave.title}`)]
       .filter(Boolean),
     link: `${location.host}${check.slug ? `/${check.slug}` : `/?check=${check.key}`}`,
     nick,
