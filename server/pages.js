@@ -26,7 +26,8 @@ const EVENT_DESCRIPTION = 'Проверь по своей натальной к�
 // сразу, чтобы до загрузки скриптов не мелькала «Натальная карта».
 export function metaForCheck(check) {
   return {
-    title: check.share || check.title,
+    // meta_title - заголовок превью ссылки, если он нужен отдельно от сторис.
+    title: check.meta_title || check.share || check.title,
     description: check.description || CHECK_DESCRIPTION,
     heading: check.heading || check.title,
     heading_em: check.heading_em ?? 'в твоей карте',

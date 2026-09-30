@@ -188,6 +188,20 @@ export function renderWheel(chart, { exactTime, overlay = null, highlight = null
   if (overlay) {
     // Градус события - сквозная черта через все кольца (у полнолуния - оба
     // конца оси).
+    // Дуга на внешнем кольце - зона разворота ретроградной планеты.
+    if (overlay.arc) {
+      const { from, to } = overlay.arc;
+      const span = (((to - from) % 360) + 360) % 360;
+      const steps = Math.max(2, Math.ceil(span / 2));
+      const outer = [];
+      const innerArc = [];
+      for (let i = 0; i <= steps; i += 1) {
+        outer.push(point(from + (span * i) / steps, R_OUT + 8));
+        innerArc.push(point(from + (span * i) / steps, R_OUT));
+      }
+      const pts = [...outer, ...innerArc.reverse()].map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`);
+      svg.append(node('polygon', { points: pts.join(' '), class: 'sky-arc' }));
+    }
     for (const at of overlay.points || [overlay.point]) {
       svg.append(line(at, R_INNER, at, R_OUT + 4, 'event-axis'));
     }

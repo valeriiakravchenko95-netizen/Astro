@@ -25,7 +25,7 @@ import {
 import { loadEvents } from './astro/transits.js';
 import { setGender, textNodes } from './text.js';
 import {
-  loadChecks, askedCheck, neededCheckTexts, addCheckTexts, renderCheck,
+  loadChecks, askedCheck, neededCheckTexts, addCheckTexts, renderCheck, retroContacts,
 } from './checks.js';
 
 const form = document.getElementById('form');
@@ -339,7 +339,34 @@ function renderBodyWheel(chart, check, exactTime) {
   return node;
 }
 
+// Ретроградная планета: дуга зоны разворота снаружи колеса, дома, по которым
+// она проходит, и точки карты в зоне.
+function renderRetroWheel(chart, check, exactTime) {
+  const node = card('Где это в твоей карте');
+  const found = retroContacts(chart, check);
+  const { from, to, body } = check.retro;
+  const span = ((to - from) % 360 + 360) % 360;
+  const planet = BY_KEY.get(body);
+  const overlay = {
+    points: [from, to],
+    arc: { from, to },
+    hits: found.inside.filter((hit) => hit.key === 'asc' || hit.key === 'mc')
+      .map((hit) => ({ natalKind: 'angle', natal: hit.key, source: hit.longitude })),
+    bodies: planet ? [{ ...planet, longitude: from + span / 2 }] : [],
+  };
+  const bodies = found.inside.filter((hit) => hit.key !== 'asc' && hit.key !== 'mc').map((hit) => hit.key);
+  node.append(renderWheel(chart, { exactTime, overlay, highlight: { houses: found.houses, bodies } }));
+  const legend = element('p', 'sky-legend');
+  legend.append(element('b', null, 'Коралловая дуга снаружи - зона разворота'),
+    found.houses.length ? `, подсвечены дома, по которым она проходит: ${found.houses.join(', ')}` : '');
+  if (found.inside.length) legend.append(`, и точки твоей карты в этой зоне: ${found.inside.map((hit) => hit.label).join(', ')}`);
+  legend.append('.');
+  node.append(legend);
+  return node;
+}
+
 function renderCheckWheel(chart, check, exactTime) {
+  if (check.kind === 'retro') return renderRetroWheel(chart, check, exactTime);
   if (check.kind === 'crisis') return renderCrisisWheel(chart, exactTime);
   if (check.wheel_body) return renderBodyWheel(chart, check, exactTime);
   const node = card('Где это в твоей карте');

@@ -24,7 +24,11 @@ const chart = (exactTime, house, sign) => ({
   exactTime,
   houseSystem: 'placidus',
   houses: new Map([['placidus', { cusps: Array.from({ length: 12 }, (_, i) => (i * 30 + sign * 30) % 360) }]]),
-  positions: new Map(BODIES.map((b) => [b, { house, sign: { index: sign } }])),
+  angles: { asc: sign * 30, mc: (sign * 30 + 270) % 360 },
+  aspects: [],
+  // Все точки в одном градусе: у ретроградной планеты это худший случай -
+  // в зоне разворота сразу все личные точки.
+  positions: new Map(BODIES.map((b) => [b, { house, sign: { index: sign }, longitude: sign * 30 + 5, body: { name: b } }])),
 });
 const out = {};
 for (const check of m.stripCheckTexts(full)) {
