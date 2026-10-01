@@ -44,7 +44,6 @@ let chosenPlace = null;
 // Опубликованная страница берет тексты у сервера по одному запросу на карту.
 // При работе с исходниками тексты уже загружены целиком из content/.
 let published = false;
-let checkList = [];
 
 function setStatus(text, isError = false) {
   status.textContent = text;
@@ -94,32 +93,28 @@ function applyLanding() {
   document.title = `${heading.title} · Валерия Кравченко`;
 }
 
-// Главная: темы из рилсов списком, каждая ведет на свою короткую ссылку.
-function renderHub() {
+// Без личной ссылки страница закрыта: каждая тема открывается только по
+// своей ссылке, которую присылают в директ за кодовое слово.
+function renderClosed() {
   form.hidden = true;
   const header = document.querySelector('header');
   const h1 = header.querySelector('h1');
-  h1.replaceChildren('Натальная карта ', element('em', null, glue('по темам')));
+  h1.replaceChildren('Проверка ', element('em', null, glue('по твоей карте')));
   const lead = header.querySelector('h1 + p');
   if (lead) {
-    lead.textContent = 'Выбери тему - страница покажет, что про нее говорит твоя карта. '
-      + 'Расчет идет в твоем браузере: дата и место рождения никуда не отправляются.';
+    lead.textContent = 'Эта страница открывается по личной ссылке. Напиши кодовое слово '
+      + 'под рилсом - и я пришлю ссылку на нужную тему.';
   }
-  const node = element('section', 'card hub');
-  node.append(element('h2', null, 'Темы'));
-  for (const check of [...checkList].reverse()) {
-    if (!check.slug) continue;
-    const item = element('div', 'hub-item');
-    const title = element('h3', null, check.heading || check.title);
-    if (check.heading_em) title.append(' ', element('em', null, check.heading_em));
-    item.append(title);
-    if (check.description) item.append(element('p', null, check.description));
-    const link = element('a', 'button', 'Проверить');
-    link.href = `/${check.slug}`;
-    item.append(link);
-    node.append(item);
+  const nick = instagramNick().replace(/^@/, '');
+  if (nick) {
+    const node = element('section', 'card offer offer-follow');
+    node.append(element('p', null, 'Все темы и кодовые слова - в рилсах у меня в инстаграме.'));
+    const link = element('a', 'button', 'Открыть инстаграм');
+    link.href = `https://www.instagram.com/${nick}/`;
+    link.rel = 'noopener';
+    node.append(link);
+    result.replaceChildren(node);
   }
-  result.replaceChildren(node);
 }
 
 async function boot() {
@@ -135,14 +130,13 @@ async function boot() {
         setOpenCards(siteSettings().showcase_open, siteSettings().showcase_note);
       }),
       fetch('content/public.json').then((response) => { published = response.ok; }, () => {}),
-      loadChecks().then((list) => { checkList = list || []; }),
+      loadChecks(),
     ]);
     ephemeris = loaded;
     applyLanding();
-    // Без ссылки на тему или событие разбора натальной карты нет: на главной -
-    // список тем из рилсов.
+    // Без ссылки на тему или событие разбора натальной карты нет.
     if (!fromReel()) {
-      renderHub();
+      renderClosed();
       return;
     }
     submit.disabled = false;

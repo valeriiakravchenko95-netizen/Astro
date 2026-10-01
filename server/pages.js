@@ -10,7 +10,10 @@ const slugOf = (pathname) => {
 export function checkForPath(checkFile, pathname) {
   const slug = slugOf(pathname);
   if (!slug) return null;
-  return (checkFile.checks || []).find((check) => check.slug === slug || check.key === slug) || null;
+  // Только по своей ссылке (или старой, если она оставлена в aliases): по
+  // ключу проверки или чужому адресу страница не открывается.
+  return (checkFile.checks || []).find((check) => check.slug === slug
+    || (check.aliases || []).includes(slug)) || null;
 }
 
 // Ссылка на событие неба из раздела links в transits.json.
@@ -32,6 +35,7 @@ export function metaForCheck(check) {
     heading: check.heading || check.title,
     heading_em: check.heading_em ?? 'в твоей карте',
     lead: check.lead,
+    check: check.key,
   };
 }
 
@@ -50,7 +54,7 @@ const escape = (text) => String(text).replace(/&/g, '&amp;').replace(/"/g, '&quo
 const glue = (text) => String(text).replace(/(^|\s)([а-яa-z]{1,2})\s/giu, '$1$2&nbsp;');
 
 export async function rewriteMeta(page, {
-  title, description, heading, heading_em: accent, lead,
+  title, description, heading, heading_em: accent, lead, check,
 }) {
   let html = await page.text();
   html = html
@@ -63,6 +67,9 @@ export async function rewriteMeta(page, {
     if (lead) html = html.replace(/(<\/h1>\s*<p>)[\s\S]*?(<\/p>)/, `$1${escape(lead)}$2`);
     html = html.replace('<header>', '<header class="landing">');
   }
+  // Какую проверку показать, страница узнает только от сервера: списка
+  // ссылок у нее нет, и по одной ссылке нельзя найти другие.
+  if (check) html = html.replace('</head>', `<meta name="page-check" content="${escape(check)}">\n</head>`);
   const headers = new Headers(page.headers);
   headers.set('content-type', 'text/html; charset=utf-8');
   headers.delete('content-length');

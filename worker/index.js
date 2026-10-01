@@ -30,6 +30,11 @@ export default {
       const page = await env.ASSETS.fetch(new Request(new URL('/', url), request));
       return rewriteMeta(page, check ? metaForCheck(check) : metaForEvent(link));
     }
+    // Любой другой адрес без расширения - закрытая главная: по чужой или
+    // угаданной ссылке тема не открывается.
+    if (url.pathname !== '/' && !/\.[a-z0-9]+$/i.test(url.pathname)) {
+      return env.ASSETS.fetch(new Request(new URL('/', url), request));
+    }
     return env.ASSETS.fetch(request);
   },
 };

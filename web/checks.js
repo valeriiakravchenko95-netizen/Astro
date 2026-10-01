@@ -44,7 +44,7 @@ export async function loadChecks() {
 export function flattenCheckTexts(full) {
   const flat = {};
   for (const check of full.checks || []) {
-    for (const field of ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'natal_retro', 'ruler', 'planet_houses']) {
+    for (const field of ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'natal_retro', 'ruler', 'planet_houses', 'past']) {
       if (check[field]) flat[`${check.key}.${field}`] = check[field];
     }
     // Ретроградная планета: напряжение к каждой точке - tension.sun и т.д.
@@ -85,7 +85,7 @@ export function flattenCheckTexts(full) {
 
 // Что из проверки можно отдать странице заранее: условия, заголовки,
 // кодовое слово. Тексты - только с сервера.
-const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
+const PUBLIC_FIELDS = ['key', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
   'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body',
   'zone_of', 'groups_as', 'score', 'wheel_link', 'offer', 'anchor_of', 'more_label',
   'path_ruler', 'path_fallback', 'path_label', 'retro', 'description'];
@@ -105,11 +105,9 @@ export function addCheckTexts(more) {
 // /dengi - по полю slug. Короткие ссылки удобнее в сторис и видны в
 // статистике по отдельности.
 export function askedCheck() {
-  const key = new URLSearchParams(location.search).get('check');
-  const path = decodeURIComponent(location.pathname).replace(/^\/+|\/+$/g, '').toLowerCase();
-  return definitions.find((check) => check.key === key)
-    || definitions.find((check) => path && (check.slug === path || check.key === path))
-    || null;
+  // Проверку выбирает сервер по ссылке и подставляет ее ключ в страницу.
+  const key = document.querySelector('meta[name="page-check"]')?.content;
+  return key ? definitions.find((check) => check.key === key) || null : null;
 }
 
 // С картой - только варианты, которые ей выпадут (дом, стихия): сервер отдает
@@ -131,7 +129,7 @@ export function neededCheckTexts(check, chart = null) {
   const keys = ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'notime'].map((field) => `${check.key}.${field}`);
   for (const item of check.indicators || []) keys.push(`${check.key}.i.${item.id}`);
   if (check.kind === 'retro') {
-    keys.push(`${check.key}.natal_retro`, `${check.key}.ruler`, `${check.key}.planet_houses`);
+    keys.push(`${check.key}.natal_retro`, `${check.key}.ruler`, `${check.key}.planet_houses`, `${check.key}.past`);
     const found = chart ? retroContacts(chart, check) : null;
     const strained = found ? found.tension.map((hit) => hit.key) : TENSION_POINTS;
     for (const point of strained) keys.push(`${check.key}.tension.${point}`);
@@ -556,7 +554,7 @@ async function storyImage({ title, big, small, lines, link, nick }) {
   ctx.fillText('Проверь свою карту', width / 2, height - 250);
   ctx.font = '500 34px -apple-system, Helvetica, sans-serif';
   ctx.fillStyle = '#7a6f63';
-  ctx.fillText(link, width / 2, height - 190);
+  ctx.fillText('напиши мне в инстаграм', width / 2, height - 190);
   if (nick) ctx.fillText(nick, width / 2, height - 140);
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
@@ -769,7 +767,6 @@ function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } 
     small: bunt?.age ? 'лет - мой бунт' : 'моя карта',
     lines: [typeTitle, ...rows.filter((row) => row.age).slice(0, 4).map((row) => `${row.age} - ${row.wave.plain || row.wave.title}`)]
       .filter(Boolean),
-    link: `${location.host}${check.slug ? `/${check.slug}` : `/?check=${check.key}`}`,
     nick,
   }, holder));
   node.append(share, holder);
@@ -974,6 +971,28 @@ function renderRetro(chart, check, { nick = '', ephemeris = null } = {}) {
     node.append(block);
   }
 
+  // Человек из прошлого: зона идет по сферам близких отношений (5, 7, 8 дом)
+  // или задевает Венеру, Луну или ось партнерства (оппозиция к Асценденту).
+  const past = texts[`${check.key}.past`];
+  if (past) {
+    const reasons = [];
+    for (const house of found.houses) if ([5, 7, 8].includes(house)) reasons.push(`зона разворота в ${house} доме`);
+    for (const hit of [...found.inside, ...found.tension]) {
+      if (['venus', 'moon'].includes(hit.key)) reasons.push(`${hit.label}${hit.aspect ? ` - ${hit.aspect}` : ' в зоне'}`);
+    }
+    if (found.inside.some((hit) => hit.key === 'asc')
+      || found.tension.some((hit) => hit.key === 'asc' && hit.aspect === 'оппозиция')) {
+      reasons.push('ось партнерства');
+    }
+    if (reasons.length) {
+      const block = element('div', 'reading hit');
+      block.append(element('h3', null, 'Человек из прошлого'));
+      block.append(element('p', 'where', reasons.join(' · ')));
+      block.append(...textNodes(past));
+      node.append(block);
+    }
+  }
+
   // Сферы, за которые сама планета отвечает в карте, - тоже на пересмотре.
   const own = texts[`${check.key}.planet_houses`];
   const ownHouses = found.planetRules.filter((house) => !found.houses.includes(house));
@@ -1012,7 +1031,6 @@ function renderRetro(chart, check, { nick = '', ephemeris = null } = {}) {
     big: found.inside.length ? String(found.inside.length) : '·',
     small: found.inside.length ? 'точки моей карты в зоне разворота' : 'моя карта',
     lines: titles.slice(0, 4),
-    link: `${location.host}${check.slug ? `/${check.slug}` : `/?check=${check.key}`}`,
     nick,
   }, holder));
   node.append(share, holder);
@@ -1280,7 +1298,6 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     small: big ? small : 'моя карта',
     // Без совпадений на картинке для сторис - свой путь, а не пустота.
     lines: yes.length ? yes.map((r) => r.item.title) : [pathTitle].filter(Boolean),
-    link: `${location.host}${check.slug ? `/${check.slug}` : `/?check=${check.key}`}`,
     nick,
   }, holder));
   node.append(share, holder);

@@ -49,8 +49,7 @@ function askedLink() {
 }
 
 export function askedEvent() {
-  const byQuery = findEvent(new URLSearchParams(location.search).get('event'));
-  if (byQuery) return byQuery;
+  // Событие открывается только по своей короткой ссылке.
   const link = askedLink();
   return link ? findEvent(link.event) : null;
 }
@@ -60,7 +59,7 @@ export function askedEvent() {
 export function eventHeading() {
   const event = askedEvent();
   if (!event) return null;
-  const link = new URLSearchParams(location.search).get('event') ? null : askedLink();
+  const link = askedLink();
   const date = event.date.split('-').reverse().slice(0, 2).join('.');
   return {
     main: link?.heading || event.title,
