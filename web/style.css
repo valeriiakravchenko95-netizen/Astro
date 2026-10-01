@@ -359,3 +359,18 @@ header.landing h1 { font-size: 40px; }
 .check-card .section-head { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--line); }
 .check-card .section-head h3 { font: 400 24px/1.2 var(--serif); margin: 0 0 8px; }
 .check-card .section-head p { color: var(--muted); }
+
+/* Ретроградная планета: точные даты касания и пометка про управителя карты. */
+.reading .dates-note { margin: 0 0 10px; font-size: 13px; color: var(--sky); font-weight: 600; }
+.reading .ruler-note { margin-top: 12px; padding: 10px 12px; border-left: 2px solid var(--sky); background: var(--surface-sunken); }
+
+/* Главная: список тем. */
+.hub-item { padding: 18px 0; border-top: 1px solid var(--line); }
+.hub-item:first-of-type { border-top: 0; }
+.hub-item h3 { font: 600 22px/1.2 var(--serif); margin: 0 0 6px; }
+.hub-item h3 em { color: var(--accent-ink); }
+.hub-item p { margin: 0 0 12px; color: var(--muted); }
+.hub-item .button {
+  display: inline-block; padding: 12px 22px; background: var(--accent); color: #1f1a15; text-decoration: none;
+  font: 600 12px/1 var(--sans); letter-spacing: .2em; text-transform: uppercase; border-radius: var(--radius);
+}

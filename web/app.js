@@ -44,6 +44,7 @@ let chosenPlace = null;
 // Опубликованная страница берет тексты у сервера по одному запросу на карту.
 // При работе с исходниками тексты уже загружены целиком из content/.
 let published = false;
+let checkList = [];
 
 function setStatus(text, isError = false) {
   status.textContent = text;
@@ -93,6 +94,34 @@ function applyLanding() {
   document.title = `${heading.title} · Валерия Кравченко`;
 }
 
+// Главная: темы из рилсов списком, каждая ведет на свою короткую ссылку.
+function renderHub() {
+  form.hidden = true;
+  const header = document.querySelector('header');
+  const h1 = header.querySelector('h1');
+  h1.replaceChildren('Натальная карта ', element('em', null, glue('по темам')));
+  const lead = header.querySelector('h1 + p');
+  if (lead) {
+    lead.textContent = 'Выбери тему - страница покажет, что про нее говорит твоя карта. '
+      + 'Расчет идет в твоем браузере: дата и место рождения никуда не отправляются.';
+  }
+  const node = element('section', 'card hub');
+  node.append(element('h2', null, 'Темы'));
+  for (const check of [...checkList].reverse()) {
+    if (!check.slug) continue;
+    const item = element('div', 'hub-item');
+    const title = element('h3', null, check.heading || check.title);
+    if (check.heading_em) title.append(' ', element('em', null, check.heading_em));
+    item.append(title);
+    if (check.description) item.append(element('p', null, check.description));
+    const link = element('a', 'button', 'Проверить');
+    link.href = `/${check.slug}`;
+    item.append(link);
+    node.append(item);
+  }
+  result.replaceChildren(node);
+}
+
 async function boot() {
   try {
     const [loaded] = await Promise.all([
@@ -106,10 +135,16 @@ async function boot() {
         setOpenCards(siteSettings().showcase_open, siteSettings().showcase_note);
       }),
       fetch('content/public.json').then((response) => { published = response.ok; }, () => {}),
-      loadChecks(),
+      loadChecks().then((list) => { checkList = list || []; }),
     ]);
     ephemeris = loaded;
     applyLanding();
+    // Без ссылки на тему или событие разбора натальной карты нет: на главной -
+    // список тем из рилсов.
+    if (!fromReel()) {
+      renderHub();
+      return;
+    }
     submit.disabled = false;
     submit.textContent = 'Построить карту';
     setStatus('');
@@ -418,7 +453,7 @@ function render(chart, exactTime) {
     if (follow) result.append(follow);
     const offer = check.code_word ? null : renderOffer(check.offer || 'readings');
     if (offer) result.append(offer);
-    const more = element('button', 'more', 'Что еще в небе заденет тебя');
+    const more = element('button', 'more', 'Что еще в небе коснется тебя');
     more.type = 'button';
     target = element('div');
     target.hidden = true;

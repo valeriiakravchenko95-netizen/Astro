@@ -44,8 +44,12 @@ export async function loadChecks() {
 export function flattenCheckTexts(full) {
   const flat = {};
   for (const check of full.checks || []) {
-    for (const field of ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'tension', 'natal_retro']) {
+    for (const field of ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'natal_retro', 'ruler', 'planet_houses']) {
       if (check[field]) flat[`${check.key}.${field}`] = check[field];
+    }
+    // Ретроградная планета: напряжение к каждой точке - tension.sun и т.д.
+    if (check.tension && typeof check.tension === 'object') {
+      for (const [id, text] of Object.entries(check.tension)) flat[`${check.key}.tension.${id}`] = text;
     }
     // Связь якоря с туманом: anchor_link.hard / anchor_link.soft.
     for (const [id, text] of Object.entries(check.anchor_link || {})) flat[`${check.key}.anchor_link.${id}`] = text;
@@ -84,7 +88,7 @@ export function flattenCheckTexts(full) {
 const PUBLIC_FIELDS = ['key', 'slug', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
   'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body',
   'zone_of', 'groups_as', 'score', 'wheel_link', 'offer', 'anchor_of', 'more_label',
-  'path_ruler', 'path_fallback', 'path_label', 'retro'];
+  'path_ruler', 'path_fallback', 'path_label', 'retro', 'description'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
@@ -127,8 +131,10 @@ export function neededCheckTexts(check, chart = null) {
   const keys = ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'notime'].map((field) => `${check.key}.${field}`);
   for (const item of check.indicators || []) keys.push(`${check.key}.i.${item.id}`);
   if (check.kind === 'retro') {
-    keys.push(`${check.key}.tension`, `${check.key}.natal_retro`);
+    keys.push(`${check.key}.natal_retro`, `${check.key}.ruler`, `${check.key}.planet_houses`);
     const found = chart ? retroContacts(chart, check) : null;
+    const strained = found ? found.tension.map((hit) => hit.key) : TENSION_POINTS;
+    for (const point of strained) keys.push(`${check.key}.tension.${point}`);
     const houses = found ? found.houses : Array.from({ length: 12 }, (_, i) => i + 1);
     for (const house of houses) keys.push(`${check.key}.house.${house}`, `${check.key}.house.${house}.title`);
     const points = found ? found.inside.map((hit) => hit.key) : RETRO_POINTS;
@@ -777,11 +783,31 @@ const ELEMENT = ['fire', 'earth', 'air', 'water'];
 // Зона разворота - градусы между двумя стоянками (check.retro.from - to).
 // Сфера жизни - дома, по которым проходит зона. Лично задевает точку карты,
 // если она в зоне (с запасом orb), напряжением - если зона встает к ней
-// квадратом или оппозицией.
+// квадратом или оппозицией. Для каждой точки - точные даты, когда планета
+// проходит ее градус, и сферы, которыми эта точка в карте управляет.
 
 const RETRO_POINTS = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'asc', 'mc'];
 const ANGLE_NAMES = { asc: 'Асцендент', mc: 'МС' };
 const TENSION_POINTS = ['sun', 'moon', 'venus', 'mars', 'asc', 'mc'];
+// Короткие названия сфер по домам - для строк «отвечает за».
+const HOUSE_THEMES = ['ты и твой образ', 'свои деньги', 'слова и связи', 'дом и семья',
+  'любовь и творчество', 'работа и распорядок', 'партнерство', 'близость и общие деньги',
+  'учеба и дальние планы', 'карьера', 'друзья и планы', 'тихое и скрытое'];
+const MONTHS_OF = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа',
+  'сентября', 'октября', 'ноября', 'декабря'];
+
+const dayOf = (jd) => {
+  const date = new Date((jd - 2440587.5) * 86400000);
+  return `${date.getUTCDate()} ${MONTHS_OF[date.getUTCMonth()]}`;
+};
+
+// Дома, которыми управляет планета (по знаку на куспиде).
+function ruledHouses(chart, body) {
+  if (chart.exactTime === false || !chart.houses?.get(chart.houseSystem)) return [];
+  const out = [];
+  for (let house = 1; house <= 12; house += 1) if (houseRuler(chart, house) === body) out.push(house);
+  return out;
+}
 
 export function retroContacts(chart, check) {
   const { from, to, orb = 2 } = check.retro;
@@ -808,6 +834,7 @@ export function retroContacts(chart, check) {
       if (house && !houses.includes(house)) houses.push(house);
     }
   }
+  const chartRuler = timed && chart.houses?.get(chart.houseSystem) ? houseRuler(chart, 1) : null;
   const inside = [];
   const tension = [];
   for (const key of RETRO_POINTS) {
@@ -823,46 +850,82 @@ export function retroContacts(chart, check) {
       longitude = position.longitude;
       label = position.body.name;
     }
+    const extra = { rules: ANGLE_NAMES[key] ? [] : ruledHouses(chart, key), ruler: key === chartRuler };
     if (inZone(longitude, orb)) {
-      inside.push({ key, label, longitude });
+      inside.push({ key, label, longitude, target: longitude, ...extra });
     } else if (!TENSION_POINTS.includes(key)) {
       // Напряжением считаем только главные точки и строго по зоне, без
       // запаса: иначе «задевает» почти каждого и слово теряет смысл.
     } else if (inZone(longitude + 180, 0)) {
-      tension.push({ key, label, longitude, aspect: 'оппозиция' });
-    } else if (inZone(longitude + 90, 0) || inZone(longitude - 90, 0)) {
-      tension.push({ key, label, longitude, aspect: 'квадрат' });
+      tension.push({ key, label, longitude, target: longitude + 180, aspect: 'оппозиция', ...extra });
+    } else if (inZone(longitude + 90, 0)) {
+      tension.push({ key, label, longitude, target: longitude + 90, aspect: 'квадрат', ...extra });
+    } else if (inZone(longitude - 90, 0)) {
+      tension.push({ key, label, longitude, target: longitude - 90, aspect: 'квадрат', ...extra });
     }
   }
-  return { houses, inside, tension, timed };
+  return {
+    houses, inside, tension, timed, chartRuler,
+    planetRules: ruledHouses(chart, check.retro.body),
+  };
 }
 
-function renderRetro(chart, check, { nick = '' } = {}) {
+// Даты, когда планета проходит градус target (за всю петлю - до трех раз).
+function exactPasses(ephemeris, body, target, window) {
+  if (!ephemeris || !window) return [];
+  const out = [];
+  let previous = null;
+  for (let jd = window[0]; jd <= window[1]; jd += 0.25) {
+    if (ephemeris.covers && !ephemeris.covers(jd)) continue;
+    const off = norm180(ephemeris.position(body, jd).longitude - target);
+    if (previous !== null && Math.sign(off) !== Math.sign(previous) && Math.abs(off - previous) < 20) out.push(jd);
+    previous = off;
+  }
+  return out;
+}
+
+function retroWhere(hit, extra) {
+  const parts = [extra];
+  if (hit.rules?.length) parts.push(`отвечает за: ${hit.rules.map((house) => HOUSE_THEMES[house - 1]).join(', ')}`);
+  return parts.join(' · ');
+}
+
+function renderRetro(chart, check, { nick = '', ephemeris = null } = {}) {
   const node = element('section', 'card check-card retro');
   node.append(element('h2', null, check.title));
   const intro = texts[`${check.key}.intro`];
   if (intro) node.append(...textNodes(intro));
 
-  if (check.retro.dates?.length) {
+  const list = (rows, title) => {
     const box = element('div', 'waves');
-    box.append(element('h3', null, 'Даты'));
-    const list = element('ul', 'upcoming');
-    for (const row of check.retro.dates) {
+    box.append(element('h3', null, title));
+    const ul = element('ul', 'upcoming');
+    for (const row of rows) {
       const item = element('li');
       const line = element('div', 'item');
       line.append(element('span', 'date', row.when));
       line.append(element('span', 'what', row.what));
       if (row.note) line.append(element('span', 'touch', row.note));
       item.append(line);
-      list.append(item);
+      ul.append(item);
     }
-    box.append(list);
-    node.append(box);
-  }
+    box.append(ul);
+    return box;
+  };
+  if (check.retro.dates?.length) node.append(list(check.retro.dates, 'Даты'));
 
   const found = retroContacts(chart, check);
+  const { body } = check.retro;
   const planet = check.retro.name || 'Планета';
   const titles = [];
+  const passes = (target) => {
+    const days = exactPasses(ephemeris, body, target, check.retro.window);
+    return days.length ? `Точно на этом градусе: ${days.map(dayOf).join(', ')}` : '';
+  };
+  const rulerNote = () => {
+    const text = texts[`${check.key}.ruler`];
+    return text ? element('p', 'ruler-note', inGender(text)) : null;
+  };
 
   // Сфера жизни, где идет пересмотр.
   if (found.houses.length) {
@@ -888,23 +951,42 @@ function renderRetro(chart, check, { nick = '' } = {}) {
     const title = texts[`${check.key}.point.${hit.key}.title`];
     if (title) titles.push(title);
     const block = element('div', 'reading hit');
-    block.append(element('h3', null, title ? `Лично тебя: ${title}` : `Лично тебя: ${hit.label}`));
-    block.append(element('p', 'where', `${hit.label} в зоне разворота`));
+    block.append(element('h3', null, `Лично тебя: ${title || hit.label}`));
+    block.append(element('p', 'where', retroWhere(hit, `${hit.label} в зоне разворота`)));
+    const when = passes(hit.target);
+    if (when) block.append(element('p', 'dates-note', when));
     block.append(...textNodes(text));
+    if (hit.ruler) { const note = rulerNote(); if (note) block.append(note); }
     node.append(block);
   }
 
-  // Напряжением: квадрат или оппозиция к зоне - одним блоком.
-  if (found.tension.length && texts[`${check.key}.tension`]) {
+  // Напряжением: квадрат или оппозиция к главным точкам - у каждой свой текст.
+  for (const hit of found.tension) {
+    const text = texts[`${check.key}.tension.${hit.key}`];
+    if (!text) continue;
     const block = element('div', 'reading');
-    block.append(element('h3', null, 'Задевает напряжением'));
-    block.append(element('p', 'where', found.tension.map((hit) => `${hit.label} - ${hit.aspect}`).join(', ')));
-    block.append(...textNodes(texts[`${check.key}.tension`]));
+    block.append(element('h3', null, `Напряжением: ${hit.label}`));
+    block.append(element('p', 'where', retroWhere(hit, `${hit.label} - ${hit.aspect} к зоне разворота`)));
+    const when = passes(hit.target);
+    if (when) block.append(element('p', 'dates-note', when));
+    block.append(...textNodes(text));
+    if (hit.ruler) { const note = rulerNote(); if (note) block.append(note); }
+    node.append(block);
+  }
+
+  // Сферы, за которые сама планета отвечает в карте, - тоже на пересмотре.
+  const own = texts[`${check.key}.planet_houses`];
+  const ownHouses = found.planetRules.filter((house) => !found.houses.includes(house));
+  if (ownHouses.length && own) {
+    const block = element('div', 'reading');
+    block.append(element('h3', null, `Еще на пересмотре: ${ownHouses.map((house) => HOUSE_THEMES[house - 1]).join(', ')}`));
+    block.append(element('p', 'where', `${planet} управляет в твоей карте ${ownHouses.join(' и ')} ${ownHouses.length > 1 ? 'домами' : 'домом'}`));
+    block.append(...textNodes(own));
     node.append(block);
   }
 
   // Родились с этой планетой в ретрограде.
-  const natal = chart.positions.get(check.retro.body);
+  const natal = chart.positions.get(body);
   if (natal?.retrograde && texts[`${check.key}.natal_retro`]) {
     const block = element('div', 'reading');
     block.append(element('h3', null, `${planet} в твоей карте тоже ретроградная`));
@@ -916,6 +998,8 @@ function renderRetro(chart, check, { nick = '' } = {}) {
     const none = texts[`${check.key}.none`];
     if (none) node.append(...textNodes(none));
   }
+
+  if (check.retro.phases?.length) node.append(list(check.retro.phases, 'Как прожить эти недели'));
 
   const outro = texts[`${check.key}.outro`];
   if (outro) node.append(...textNodes(outro));
@@ -936,7 +1020,7 @@ function renderRetro(chart, check, { nick = '' } = {}) {
 }
 
 export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = null } = {}) {
-  if (check.kind === 'retro') return renderRetro(chart, check, { nick });
+  if (check.kind === 'retro') return renderRetro(chart, check, { nick, ephemeris });
   if (check.kind === 'crisis') return renderCrisis(chart, check, { dmUrl, nick, ephemeris });
   const { results, yes, unknown } = runCheck(chart, check);
   const node = element('section', 'card check-card');

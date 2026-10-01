@@ -65,7 +65,7 @@ export function eventHeading() {
   return {
     main: link?.heading || event.title,
     accent: link?.heading_em ?? date,
-    lead: link?.lead || 'Проверь по своей натальной карте, заденет ли это тебя и в какой сфере жизни. '
+    lead: link?.lead || 'Проверь по своей натальной карте, коснется ли это тебя и в какой сфере жизни. '
       + 'Расчет идет в твоем браузере: дата и место рождения никуда не отправляются.',
     title: link?.title || `${event.title} ${date}`,
   };
@@ -446,7 +446,7 @@ export function renderUpcoming(chart, { exactTime, onPick = null, exclude = new 
   const found = strongestEvents(chart, { exactTime })
     .filter(({ event }) => !exclude.has(event.key + event.date));
   const node = element('section', 'card');
-  node.append(element('h2', null, 'Что из ближайшего заденет тебя'));
+  node.append(element('h2', null, 'Что из ближайшего коснется тебя'));
   if (!found.length) {
     node.append(element('p', 'note',
       'В ближайшие полгода крупных касаний к твоим личным точкам нет.'));
