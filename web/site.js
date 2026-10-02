@@ -5,12 +5,28 @@ import { textNodes } from './text.js';
 
 let site = { author: {}, offers: {} };
 
+// Брендовая ссылка (lume): сервер ставит в страницу ее имя.
+export function activeBrand() {
+  if (typeof document === 'undefined') return '';
+  return document.querySelector('meta[name="page-brand"]')?.content || '';
+}
+
 export async function loadSite(url = 'content/site.json') {
   try {
     const response = await fetch(url);
     if (response.ok) site = { ...site, ...(await response.json()) };
   } catch (error) {
     // Без подписи страница работает как раньше.
+  }
+  // У бренда свой инстаграм и свои кнопки - они заменяют авторские.
+  const brand = site.brands?.[activeBrand()];
+  if (brand) {
+    site = {
+      ...site,
+      author: { ...(brand.author || {}) },
+      offers: { ...site.offers, ...(brand.offers || {}) },
+      brand_name: brand.name || '',
+    };
   }
   return site;
 }

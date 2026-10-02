@@ -17,12 +17,14 @@ OLD_EVENT_LINKS = {"polnolunie"}
 def test_check_links_have_secret_tail():
     checks = json.loads((ROOT / "web/content/checks.json").read_text())["checks"]
     bad = [c["key"] for c in checks if not SECRET.match(c.get("slug", ""))]
+    bad += [slug for c in checks for slug in c.get("brand_slugs", {}) if not SECRET.match(slug)]
     assert not bad, f"ссылка без случайного хвоста у проверок: {bad}"
 
 
 def test_check_links_are_unique():
     checks = json.loads((ROOT / "web/content/checks.json").read_text())["checks"]
     paths = [c["slug"] for c in checks] + [a for c in checks for a in c.get("aliases", [])]
+    paths += [b for c in checks for b in c.get("brand_slugs", {})]
     assert len(paths) == len(set(paths))
 
 

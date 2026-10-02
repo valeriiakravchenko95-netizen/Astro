@@ -90,7 +90,7 @@ function applyLanding() {
   const lead = header.querySelector('h1 + p');
   if (lead) lead.textContent = heading.lead;
   header.classList.add('landing');
-  document.title = `${heading.title} · Валерия Кравченко`;
+  document.title = `${heading.title} · ${siteSettings().brand_name || 'Валерия Кравченко'}`;
 }
 
 // Без личной ссылки страница закрыта: каждая тема открывается только по

@@ -1,3 +1,5 @@
+import { BRANDS } from './brands.js';
+
 // Короткие ссылки под рилсы: /dengi вместо /?check=big-money, /polnolunie
 // вместо /?event=lunation.full@2026-09-26. У такой ссылки свое превью в
 // мессенджерах - ее название и описание.
@@ -13,7 +15,18 @@ export function checkForPath(checkFile, pathname) {
   // Только по своей ссылке (или старой, если она оставлена в aliases): по
   // ключу проверки или чужому адресу страница не открывается.
   return (checkFile.checks || []).find((check) => check.slug === slug
-    || (check.aliases || []).includes(slug)) || null;
+    || (check.aliases || []).includes(slug) || Boolean(check.brand_slugs?.[slug])) || null;
+}
+
+// Бренд, если ссылка брендовая (brand_slugs проверки), иначе null.
+export function brandForPath(checkFile, pathname) {
+  const slug = slugOf(pathname);
+  if (!slug) return null;
+  for (const check of checkFile.checks || []) {
+    const brand = check.brand_slugs?.[slug];
+    if (brand && BRANDS[brand]) return brand;
+  }
+  return null;
 }
 
 // Ссылка на событие неба из раздела links в transits.json.
@@ -54,11 +67,12 @@ const escape = (text) => String(text).replace(/&/g, '&amp;').replace(/"/g, '&quo
 const glue = (text) => String(text).replace(/(^|\s)([а-яa-z]{1,2})\s/giu, '$1$2&nbsp;');
 
 export async function rewriteMeta(page, {
-  title, description, heading, heading_em: accent, lead, check,
+  title, description, heading, heading_em: accent, lead, check, brand,
 }) {
   let html = await page.text();
+  const look = brand ? BRANDS[brand] : null;
   html = html
-    .replace(/<title>[^<]*<\/title>/, `<title>${escape(title)} · Валерия Кравченко</title>`)
+    .replace(/<title>[^<]*<\/title>/, `<title>${escape(title)} · ${look ? look.title : 'Валерия Кравченко'}</title>`)
     .replace(/(<meta property="og:title" content=")[^"]*"/, `$1${escape(title)}"`)
     .replace(/(<meta property="og:description" content=")[^"]*"/, `$1${escape(description)}"`);
   if (heading) {
@@ -70,6 +84,13 @@ export async function rewriteMeta(page, {
   // Какую проверку показать, страница узнает только от сервера: списка
   // ссылок у нее нет, и по одной ссылке нельзя найти другие.
   if (check) html = html.replace('</head>', `<meta name="page-check" content="${escape(check)}">\n</head>`);
+  // Брендовая ссылка: свои шрифты, шапка и атрибут для стилей.
+  if (look) {
+    html = html
+      .replace('<html lang="ru">', `<html lang="ru" data-brand="${brand}">`)
+      .replace('</head>', `<meta name="page-brand" content="${brand}">\n${look.head}\n</head>`)
+      .replace(/<div class="brand">[\s\S]*?<\/div>/, look.header);
+  }
   const headers = new Headers(page.headers);
   headers.set('content-type', 'text/html; charset=utf-8');
   headers.delete('content-length');

@@ -9,6 +9,7 @@
 import { SIGNS_IN, norm180, signIndex } from './astro/zodiac.js';
 import { rulerOf, TRADITIONAL } from './astro/rulers.js';
 import { textNodes, inGender } from './text.js';
+import { activeBrand } from './site.js';
 import { allEvents, examineEvent } from './astro/transits.js';
 
 let definitions = [];
@@ -46,6 +47,10 @@ export function flattenCheckTexts(full) {
   for (const check of full.checks || []) {
     for (const field of ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'natal_retro', 'ruler', 'planet_houses', 'past']) {
       if (check[field]) flat[`${check.key}.${field}`] = check[field];
+    }
+    // Текст от лица бренда вместо авторского: outro@lume и т.п.
+    for (const [brand, fields] of Object.entries(check.brand_texts || {})) {
+      for (const [field, text] of Object.entries(fields)) flat[`${check.key}.${field}@${brand}`] = text;
     }
     // Ретроградная планета: напряжение к каждой точке - tension.sun и т.д.
     if (check.tension && typeof check.tension === 'object') {
@@ -126,7 +131,9 @@ export function neededCheckTexts(check, chart = null) {
     const position = chart?.positions.get(body);
     return position ? [ELEMENT[position.sign.index % 4]] : ELEMENT;
   };
-  const keys = ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'notime'].map((field) => `${check.key}.${field}`);
+  const brand = activeBrand();
+  const keys = ['intro', 'outro', 'none', 'none_notime', 'few', 'many', 'notime',
+    ...(brand ? [`outro@${brand}`] : [])].map((field) => `${check.key}.${field}`);
   for (const item of check.indicators || []) keys.push(`${check.key}.i.${item.id}`);
   if (check.kind === 'retro') {
     keys.push(`${check.key}.natal_retro`, `${check.key}.ruler`, `${check.key}.planet_houses`, `${check.key}.past`);
@@ -491,21 +498,39 @@ async function storyImage({ title, big, small, lines, link, nick }) {
   } catch (error) {
     // без шрифта нарисуется запасным
   }
-  const serif = "Cormorant, 'Cormorant Garamond', Georgia, serif";
-  ctx.fillStyle = '#f5f1e8';
+  // По брендовой ссылке (lume) - бумага и черные чернила лендинга.
+  const lume = activeBrand() === 'lume';
+  if (lume) {
+    try {
+      await Promise.all([document.fonts.load('500 60px "Cormorant Unicase"'), document.fonts.load('600 60px "Inter Tight"')]);
+    } catch (error) {
+      // без шрифта нарисуется запасным
+    }
+  }
+  const serif = lume ? "'Inter Tight', Helvetica, sans-serif" : "Cormorant, 'Cormorant Garamond', Georgia, serif";
+  const ink = lume ? '#101010' : '#1f1a15';
+  const accent = lume ? '#101010' : '#8a6c43';
+  const mute = lume ? 'rgba(16,16,16,.56)' : '#7a6f63';
+  ctx.fillStyle = lume ? '#efeeea' : '#f5f1e8';
   ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = '#a8875a';
+  ctx.strokeStyle = lume ? '#101010' : '#a8875a';
   ctx.lineWidth = 2;
   ctx.strokeRect(60, 60, width - 120, height - 120);
 
-  // подпись автора
+  // подпись автора или знак бренда
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#8a6c43';
-  ctx.font = '600 26px -apple-system, Helvetica, sans-serif';
-  ctx.fillText('А С Т Р О Л О Г', width / 2, 230);
-  ctx.fillStyle = '#1f1a15';
-  ctx.font = `400 58px ${serif}`;
-  ctx.fillText('Валерия Кравченко', width / 2, 300);
+  if (lume) {
+    ctx.fillStyle = ink;
+    ctx.font = "500 64px 'Cormorant Unicase', Georgia, serif";
+    ctx.fillText('L U M È', width / 2, 280);
+  } else {
+    ctx.fillStyle = accent;
+    ctx.font = '600 26px -apple-system, Helvetica, sans-serif';
+    ctx.fillText('А С Т Р О Л О Г', width / 2, 230);
+    ctx.fillStyle = ink;
+    ctx.font = `400 58px ${serif}`;
+    ctx.fillText('Валерия Кравченко', width / 2, 300);
+  }
 
   const wrap = (text, font, maxWidth) => {
     ctx.font = font;
@@ -529,16 +554,16 @@ async function storyImage({ title, big, small, lines, link, nick }) {
     y += 88;
   }
   y += 70;
-  ctx.fillStyle = '#8a6c43';
+  ctx.fillStyle = accent;
   ctx.font = `400 260px ${serif}`;
   ctx.fillText(big, width / 2, y + 170);
   y += 320;
-  ctx.fillStyle = '#7a6f63';
+  ctx.fillStyle = mute;
   ctx.font = `italic 400 54px ${serif}`;
   ctx.fillText(small, width / 2, y);
   y += 110;
 
-  ctx.fillStyle = '#1f1a15';
+  ctx.fillStyle = ink;
   for (const line of lines.slice(0, 6)) {
     for (const row of wrap(line, `400 46px ${serif}`, 800)) {
       ctx.fillText(row, width / 2, y);
@@ -547,14 +572,14 @@ async function storyImage({ title, big, small, lines, link, nick }) {
     y += 18;
   }
 
-  ctx.fillStyle = '#a8875a';
+  ctx.fillStyle = lume ? '#101010' : '#a8875a';
   ctx.fillRect(width / 2 - 30, height - 330, 60, 2);
-  ctx.fillStyle = '#1f1a15';
+  ctx.fillStyle = ink;
   ctx.font = `italic 400 48px ${serif}`;
   ctx.fillText('Проверь свою карту', width / 2, height - 250);
   ctx.font = '500 34px -apple-system, Helvetica, sans-serif';
-  ctx.fillStyle = '#7a6f63';
-  ctx.fillText('напиши мне в инстаграм', width / 2, height - 190);
+  ctx.fillStyle = mute;
+  ctx.fillText(lume ? 'напиши нам в инстаграм' : 'напиши мне в инстаграм', width / 2, height - 190);
   if (nick) ctx.fillText(nick, width / 2, height - 140);
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
@@ -563,8 +588,8 @@ async function storyImage({ title, big, small, lines, link, nick }) {
 // «Отправить подруге»: вместо ссылки - кодовое слово и ник, чтобы подруга
 // пришла по своей личной ссылке через рилс.
 function inviteButton(check, nick) {
-  if (!check.invite) return null;
-  const text = check.invite.replace('{nick}', nick || '');
+  if (!check.invite || (check.invite.includes('{nick}') && !nick)) return null;
+  const text = check.invite.replace('{nick}', nick);
   const button = element('button', 'share invite', 'Отправить подруге');
   button.type = 'button';
   const note = element('p', 'note invite-note');
@@ -770,7 +795,7 @@ function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } 
     node.append(box);
   }
 
-  const outro = texts[`${check.key}.outro`];
+  const outro = texts[`${check.key}.outro@${activeBrand()}`] || texts[`${check.key}.outro`];
   if (outro) node.append(...textNodes(outro));
 
   if (check.code_word) {
@@ -1076,7 +1101,7 @@ function renderRetro(chart, check, { nick = '', ephemeris = null } = {}) {
 
   if (check.retro.phases?.length) node.append(list(check.retro.phases, 'Как прожить эти недели'));
 
-  const outro = texts[`${check.key}.outro`];
+  const outro = texts[`${check.key}.outro@${activeBrand()}`] || texts[`${check.key}.outro`];
   if (outro) node.append(...textNodes(outro));
 
   const share = element('button', 'share', 'Сохранить результат для сторис');
@@ -1331,7 +1356,7 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     node.append(box);
   }
 
-  const outro = texts[`${check.key}.outro`];
+  const outro = texts[`${check.key}.outro@${activeBrand()}`] || texts[`${check.key}.outro`];
   if (outro) node.append(...textNodes(outro));
 
   if (check.code_word) {

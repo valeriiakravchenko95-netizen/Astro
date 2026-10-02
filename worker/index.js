@@ -9,7 +9,7 @@ import checkFile from '../web/content/checks.json' with { type: 'json' };
 import { flattenCheckTexts } from '../web/checks.js';
 import { handleTexts } from '../server/texts.js';
 import {
-  checkForPath, eventLinkForPath, metaForCheck, metaForEvent, rewriteMeta,
+  checkForPath, brandForPath, eventLinkForPath, metaForCheck, metaForEvent, rewriteMeta,
 } from '../server/pages.js';
 
 const checks = { checks: flattenCheckTexts(checkFile) };
@@ -40,7 +40,8 @@ async function route(request, env) {
       return Response.redirect(`${url.origin}${url.pathname.replace(/\/+$/, '')}${url.search}`, 301);
     }
     const page = await env.ASSETS.fetch(new Request(new URL('/', url), request));
-    return rewriteMeta(page, check ? metaForCheck(check) : metaForEvent(link));
+    const brand = check ? brandForPath(checkFile, url.pathname) : null;
+    return rewriteMeta(page, check ? { ...metaForCheck(check), brand } : metaForEvent(link));
   }
   // Любой другой адрес без расширения - закрытая главная: по чужой или
   // угаданной ссылке тема не открывается.
