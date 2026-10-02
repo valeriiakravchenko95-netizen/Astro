@@ -596,11 +596,12 @@ async function storyImage({ title, big, small, lines, link, nick }) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
-// «Отправить подруге»: вместо ссылки - кодовое слово и ник, чтобы подруга
-// пришла по своей личной ссылке через рилс.
+// «Отправить подруге»: текст со ссылкой на эту же тему и ником автора.
 function inviteButton(check, nick) {
   if (!check.invite || (check.invite.includes('{nick}') && !nick)) return null;
-  const text = check.invite.replace('{nick}', nick);
+  // {link} - ссылка на эту же тему: подруга откроет ее сразу.
+  const link = `${location.origin}${location.pathname}`;
+  const text = check.invite.replace('{nick}', nick).replace('{link}', link);
   const button = element('button', 'share invite', 'Отправить подруге');
   button.type = 'button';
   const note = element('p', 'note invite-note');
