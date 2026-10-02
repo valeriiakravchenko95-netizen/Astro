@@ -88,7 +88,7 @@ export function flattenCheckTexts(full) {
 const PUBLIC_FIELDS = ['key', 'title', 'houses', 'more', 'code_word', 'cta', 'share',
   'heading', 'heading_em', 'lead', 'houses_label', 'kind', 'element_of', 'wheel_body',
   'zone_of', 'groups_as', 'score', 'wheel_link', 'offer', 'anchor_of', 'more_label',
-  'path_ruler', 'path_fallback', 'path_label', 'retro', 'description'];
+  'path_ruler', 'path_fallback', 'path_label', 'retro', 'description', 'invite'];
 
 export function stripCheckTexts(full) {
   return (full.checks || []).map((check) => ({
@@ -560,6 +560,35 @@ async function storyImage({ title, big, small, lines, link, nick }) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
+// «Отправить подруге»: вместо ссылки - кодовое слово и ник, чтобы подруга
+// пришла по своей личной ссылке через рилс.
+function inviteButton(check, nick) {
+  if (!check.invite) return null;
+  const text = check.invite.replace('{nick}', nick || '');
+  const button = element('button', 'share invite', 'Отправить подруге');
+  button.type = 'button';
+  const note = element('p', 'note invite-note');
+  button.addEventListener('click', async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      note.textContent = 'Текст скопирован - вставь его в сообщение подруге.';
+    } catch {
+      note.textContent = text;
+    }
+  });
+  const box = element('div', 'invite-box');
+  box.append(button, note);
+  return box;
+}
+
 async function shareStory(options, holder) {
   const blob = await storyImage(options);
   if (!blob) return;
@@ -770,6 +799,8 @@ function renderCrisis(chart, check, { dmUrl = '', nick = '', ephemeris = null } 
     nick,
   }, holder));
   node.append(share, holder);
+  const invite = inviteButton(check, nick);
+  if (invite) node.append(invite);
   return node;
 }
 
@@ -795,7 +826,7 @@ const MONTHS_OF = ['января', 'февраля', 'марта', 'апреля
 
 const dayOf = (jd) => {
   const date = new Date((jd - 2440587.5) * 86400000);
-  return `${date.getUTCDate()} ${MONTHS_OF[date.getUTCMonth()]}`;
+  return `${date.getUTCDate()}\u00a0${MONTHS_OF[date.getUTCMonth()]}`;
 };
 
 // Дома, которыми управляет планета (по знаку на куспиде).
@@ -909,16 +940,41 @@ function renderRetro(chart, check, { nick = '', ephemeris = null } = {}) {
     box.append(ul);
     return box;
   };
-  if (check.retro.dates?.length) node.append(list(check.retro.dates, 'Даты'));
-
   const found = retroContacts(chart, check);
   const { body } = check.retro;
   const planet = check.retro.name || 'Планета';
   const titles = [];
+  const passDays = (target) => exactPasses(ephemeris, body, target, check.retro.window);
   const passes = (target) => {
-    const days = exactPasses(ephemeris, body, target, check.retro.window);
+    const days = passDays(target);
     return days.length ? `Точно на этом градусе: ${days.map(dayOf).join(', ')}` : '';
   };
+
+  // Коротко про тебя: сфера, личные точки, свои даты - одним взглядом.
+  {
+    const box = element('div', 'retro-summary');
+    box.append(element('h3', null, 'Коротко про тебя'));
+    const rows = [];
+    const sphere = found.houses.map((house) => texts[`${check.key}.house.${house}.title`]).filter(Boolean);
+    rows.push(['Где пересмотр', sphere.length ? sphere.join(' · ') : 'нужно точное время рождения']);
+    const personal = [...found.inside.map((hit) => hit.label), ...found.tension.map((hit) => `${hit.label} (${hit.aspect})`)];
+    rows.push(['Лично тебя', personal.length ? personal.join(', ') : 'почти не касается - пройдет фоном']);
+    // В выжимке - только даты, которые еще впереди; все даты - в блоках ниже.
+    const today = Date.now() / 86400000 + 2440587.5 - 1;
+    const days = [...found.inside, ...found.tension].flatMap((hit) => passDays(hit.target))
+      .filter((jd) => jd >= today).sort((a, b) => a - b);
+    const unique = [...new Set(days.map(dayOf))];
+    if (unique.length) rows.push(['Твои даты впереди', unique.slice(0, 6).join(', ')]);
+    if (found.chartRuler && [...found.inside, ...found.tension].some((hit) => hit.ruler)) {
+      rows.push(['Важно', 'задета главная точка твоей карты']);
+    }
+    const list = element('dl');
+    for (const [term, value] of rows) list.append(element('dt', null, term), element('dd', null, value));
+    box.append(list);
+    node.append(box);
+  }
+
+  if (check.retro.dates?.length) node.append(list(check.retro.dates, 'Даты'));
   const rulerNote = () => {
     const text = texts[`${check.key}.ruler`];
     return text ? element('p', 'ruler-note', inGender(text)) : null;
@@ -1034,6 +1090,8 @@ function renderRetro(chart, check, { nick = '', ephemeris = null } = {}) {
     nick,
   }, holder));
   node.append(share, holder);
+  const invite = inviteButton(check, nick);
+  if (invite) node.append(invite);
   return node;
 }
 
@@ -1301,5 +1359,7 @@ export function renderCheck(chart, check, { dmUrl = '', nick = '', ephemeris = n
     nick,
   }, holder));
   node.append(share, holder);
+  const invite = inviteButton(check, nick);
+  if (invite) node.append(invite);
   return node;
 }
