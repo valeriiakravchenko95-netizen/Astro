@@ -384,45 +384,42 @@ header.landing h1 { font-size: 40px; }
 .invite-box { margin-top: 10px; }
 .invite-note:empty { display: none; }
 
-/* ===== Брендовая ссылка lume: стиль лендинга lumeself.com =====
-   Серая бумага, черные чернила, Inter Tight, знак Lumè в Cormorant
-   Unicase, прямые углы. Темной темы у бренда нет: всегда светлая. */
+/* ===== Брендовая ссылка lume: стиль lumeself.com =====
+   Белый фон, темно-синие чернила #101628, серо-синий #677389 для мелких
+   подписей капслоком, заголовки антиквой (Playfair Display), текст
+   системным шрифтом, кнопки-таблетки. Всегда светлая. */
 html[data-brand="lume"] {
-  --bg: #efeeea;
-  --surface: #f4f3ef;
-  --surface-sunken: #e4e2dc;
-  --line: rgba(16, 16, 16, .16);
-  --text: #101010;
-  --muted: rgba(16, 16, 16, .56);
-  --accent: #101010;
-  --accent-ink: #101010;
-  --accent-soft: #e4e2dc;
-  --danger: #8a2b2b;
-  --sky: #b5483f;
-  --serif: 'LumeAstro', 'Inter Tight', system-ui, Arial, sans-serif;
-  --sans: 'LumeAstro', 'Inter Tight', system-ui, Arial, sans-serif;
-  --radius: 0;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-sunken: #f5f6f9;
+  --line: #e6e8ec;
+  --text: #101628;
+  --muted: #677389;
+  --accent: #101628;
+  --accent-ink: #677389;
+  --accent-soft: #f5f6f9;
+  --danger: #a34536;
+  --sky: #d27a6b;
+  --serif: 'LumeAstro', 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --sans: 'LumeAstro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --radius: 18px;
   color-scheme: light;
 }
-html[data-brand="lume"] body { background: var(--bg); color: var(--text); }
-html[data-brand="lume"] .brand-lume { flex-direction: row; gap: 10px; }
-html[data-brand="lume"] .brand-lume .lmark { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-html[data-brand="lume"] .brand-lume .brand-name {
-  font: 500 16px/1 'Cormorant Unicase', Georgia, serif; letter-spacing: .34em; text-transform: uppercase;
+html[data-brand="lume"] body { background: var(--bg); color: var(--text); font-family: var(--sans); }
+html[data-brand="lume"] .brand-lume { margin-bottom: 30px; }
+html[data-brand="lume"] .brand-lume img { display: block; width: 110px; height: auto; }
+html[data-brand="lume"] h1 { font-weight: 400; letter-spacing: -.01em; }
+html[data-brand="lume"] h1 em { font-style: normal; color: var(--text); }
+html[data-brand="lume"] h2::after { background: var(--line); }
+html[data-brand="lume"] button, html[data-brand="lume"] .button,
+html[data-brand="lume"] .offer .button, html[data-brand="lume"] .cta .button, html[data-brand="lume"] .hub-item .button {
+  border-radius: 999px; text-transform: none; letter-spacing: 0; font: 500 16px/1.2 var(--sans);
 }
-html[data-brand="lume"] h1 { font-weight: 600; letter-spacing: -.03em; line-height: 1; }
-html[data-brand="lume"] h1 em { font-family: 'Cormorant Unicase', Georgia, serif; font-style: italic; font-weight: 500; letter-spacing: .01em; color: var(--text); }
-html[data-brand="lume"] h2 { font-weight: 600; letter-spacing: -.03em; }
-html[data-brand="lume"] h2::after { background: var(--text); }
-html[data-brand="lume"] .reading h3, html[data-brand="lume"] .retro-summary h3, html[data-brand="lume"] .hub-item h3 {
-  font-weight: 600; letter-spacing: -.02em;
-}
-html[data-brand="lume"] .card { border-color: transparent; border-top: 1px solid var(--text); background: transparent; padding-left: 0; padding-right: 0; }
-html[data-brand="lume"] .offer { background: var(--text); color: var(--bg); padding-left: 22px; padding-right: 22px; }
-html[data-brand="lume"] .offer-follow { background: transparent; color: var(--text); border: 1px solid var(--text); }
-html[data-brand="lume"] .offer .button, html[data-brand="lume"] .cta .button {
-  background: var(--bg); color: var(--text); font-size: 11px; letter-spacing: .18em;
-}
-html[data-brand="lume"] .offer-follow .button { background: var(--text); color: var(--bg); }
-html[data-brand="lume"] .periods .months, html[data-brand="lume"] .check-card .periods .months { color: var(--text); }
-html[data-brand="lume"] .retro-summary { border-color: var(--text); }
+html[data-brand="lume"] #submit::after, html[data-brand="lume"] .offer .button::after { content: '  →'; }
+html[data-brand="lume"] .share, html[data-brand="lume"] button.more { background: transparent; color: var(--text); border: 1px solid var(--line); }
+html[data-brand="lume"] .offer { background: var(--text); color: #fff; border-color: var(--text); }
+html[data-brand="lume"] .offer .button { background: #fff; color: var(--text); padding: 15px 26px; }
+html[data-brand="lume"] .offer-follow { background: var(--surface-sunken); color: var(--text); border-color: var(--line); }
+html[data-brand="lume"] .offer-follow .button { background: var(--text); color: #fff; }
+html[data-brand="lume"] .retro-summary { border-color: var(--line); background: var(--surface-sunken); }
+html[data-brand="lume"] .reading .dates-note { color: var(--sky); }

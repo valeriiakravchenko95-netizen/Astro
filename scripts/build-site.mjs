@@ -32,6 +32,8 @@ for (const file of ['favicon.svg', 'apple-touch-icon.png', 'logo.svg', 'preview.
 fs.cpSync(path.join(web, 'fonts'), path.join(dist, 'fonts'), { recursive: true });
 fs.cpSync(path.join(web, 'data'), path.join(dist, 'data'), { recursive: true });
 fs.copyFileSync(path.join(web, 'content', 'site.json'), path.join(dist, 'content', 'site.json'));
+// Знаки брендов для брендовых ссылок (lume).
+fs.cpSync(path.join(web, 'brand'), path.join(dist, 'brand'), { recursive: true });
 
 const read = (name) => JSON.parse(fs.readFileSync(path.join(web, 'content', name), 'utf8'));
 fs.writeFileSync(path.join(dist, 'content', 'public.json'), JSON.stringify({

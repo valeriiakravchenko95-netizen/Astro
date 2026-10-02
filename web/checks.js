@@ -502,27 +502,37 @@ async function storyImage({ title, big, small, lines, link, nick }) {
   const lume = activeBrand() === 'lume';
   if (lume) {
     try {
-      await Promise.all([document.fonts.load('500 60px "Cormorant Unicase"'), document.fonts.load('600 60px "Inter Tight"')]);
+      await document.fonts.load('400 60px "Playfair Display"');
     } catch (error) {
       // без шрифта нарисуется запасным
     }
   }
-  const serif = lume ? "'Inter Tight', Helvetica, sans-serif" : "Cormorant, 'Cormorant Garamond', Georgia, serif";
-  const ink = lume ? '#101010' : '#1f1a15';
-  const accent = lume ? '#101010' : '#8a6c43';
-  const mute = lume ? 'rgba(16,16,16,.56)' : '#7a6f63';
-  ctx.fillStyle = lume ? '#efeeea' : '#f5f1e8';
+  const serif = lume ? "'Playfair Display', Georgia, serif" : "Cormorant, 'Cormorant Garamond', Georgia, serif";
+  const ink = lume ? '#101628' : '#1f1a15';
+  const accent = lume ? '#101628' : '#8a6c43';
+  const mute = lume ? '#677389' : '#7a6f63';
+  ctx.fillStyle = lume ? '#ffffff' : '#f5f1e8';
   ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = lume ? '#101010' : '#a8875a';
+  ctx.strokeStyle = lume ? '#e6e8ec' : '#a8875a';
   ctx.lineWidth = 2;
   ctx.strokeRect(60, 60, width - 120, height - 120);
 
   // подпись автора или знак бренда
   ctx.textAlign = 'center';
   if (lume) {
-    ctx.fillStyle = ink;
-    ctx.font = "500 64px 'Cormorant Unicase', Georgia, serif";
-    ctx.fillText('L U M È', width / 2, 280);
+    // Знак lume - картинкой, как в шапке сайта.
+    try {
+      const logo = new Image();
+      logo.src = '/brand/lume-logo.png';
+      await logo.decode();
+      const w = 300;
+      const h = (logo.naturalHeight / logo.naturalWidth) * w;
+      ctx.drawImage(logo, (width - w) / 2, 200, w, h);
+    } catch (error) {
+      ctx.fillStyle = ink;
+      ctx.font = `400 72px ${serif}`;
+      ctx.fillText('lume', width / 2, 280);
+    }
   } else {
     ctx.fillStyle = accent;
     ctx.font = '600 26px -apple-system, Helvetica, sans-serif';
@@ -531,6 +541,7 @@ async function storyImage({ title, big, small, lines, link, nick }) {
     ctx.font = `400 58px ${serif}`;
     ctx.fillText('Валерия Кравченко', width / 2, 300);
   }
+  ctx.fillStyle = ink;
 
   const wrap = (text, font, maxWidth) => {
     ctx.font = font;
@@ -572,7 +583,7 @@ async function storyImage({ title, big, small, lines, link, nick }) {
     y += 18;
   }
 
-  ctx.fillStyle = lume ? '#101010' : '#a8875a';
+  ctx.fillStyle = lume ? '#101628' : '#a8875a';
   ctx.fillRect(width / 2 - 30, height - 330, 60, 2);
   ctx.fillStyle = ink;
   ctx.font = `italic 400 48px ${serif}`;

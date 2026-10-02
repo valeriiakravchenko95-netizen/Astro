@@ -418,12 +418,14 @@ https://ваш-адрес/?event=station.uranus.retrograde@2026-09-10
 ### Брендовая ссылка lume
 
 Та же тема, но в стиле lumeself.com: `brand_slugs` у проверки
-(`{"venera-lume-ibx7om": "lume"}`). Сервер ставит странице шрифты и знак
-Lumè (server/brands.js), стили - блок `html[data-brand="lume"]` в
-style.css. Инстаграм и кнопки бренда - `brands.lume` в site.json: пока
-`instagram` пустой, кнопок с инстаграмом и «Отправить подруге» нет, а
-карточка внизу ведет на lumeself.com. Тексты, где автор говорит «я», для
-бренда заменяются из `brand_texts` (`outro`).
+(`{"venera-lume-ibx7om": "lume"}`). Белый фон, темно-синий текст #101628,
+серо-синий #677389 для подписей капслоком, заголовки Playfair Display,
+кнопки-таблетки, знак lume - картинкой `web/brand/lume-logo.png`. Сервер
+ставит шрифт и шапку (server/brands.js), стили - блок
+`html[data-brand="lume"]` в style.css. Инстаграм и кнопки бренда -
+`brands.lume` в site.json: пока `instagram` пустой, кнопок с инстаграмом и
+«Отправить подруге» нет, а карточка внизу ведет на lumeself.com. Тексты, где
+автор говорит «я», для бренда заменяются из `brand_texts` (`outro`).
 
 ### Кнопка «Отправить подруге»
 
